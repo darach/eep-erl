@@ -1,0 +1,11 @@
+{application, eep_app,
+ [
+  {description, "Embedded Event Processing. Windowed processes & Aggregate Functions"},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []}
+ ]}.
