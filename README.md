@@ -121,6 +121,6 @@ You can roll your own clock for monotonic windows by implementing the **eep_cloc
 3. Consider a simpler solution than gen_event for wiring up emitted events.
 4. Add performance tests. Indicatively 600-700K messages per second to a window process.
 5. Explore rewriting performance critical sections and aggregate functions in C, exposed as NIFs.
-6. Steal (**beam.js**)[http://github.com/darach/eep-js/] beams and pipes but make it erlangy somehow.
+6. Steal (**beam.js**)[http://github.com/darach/beam-js/] beams and pipes but make it erlangy somehow.
 
 ## Enjoy!
