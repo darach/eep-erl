@@ -16,24 +16,29 @@ This version is different. It uses processes and message passing and callbacks a
 
 There are a number of excellent projects for monitoring/metrics systems already available in Erlang, such as Boundary's excellent [folsom](http://github.com/boundary/folsom). If you need a monitoring or metrics system use those. They do what they say on the tin. If you want lower level building blocks, **eep.erl** gives you four different types of windowed event processing with pluggable aggregate functions.
 
-## Getting Started
+## Getting Started in the shell
 
-Include the header.
+Compile with
 
 ```
-include_lib("eep_erl/include/eep_erl.hrl").
+rebar compile
+```
+
+Start with
+```
+erl -pa ebin
 ```
 
 Create a tumbling window process.
 
 ```
-P = eep_window_tumbling(eep_stats_count, 4).
+P = eep_window_tumbling:start(eep_stats_count, 4).
 ```
 
 Add an event handler to capture window emissions.
 
 ```
-P ! {add_handler, eep_emit_trace, []).
+P ! {add_handler, eep_emit_trace, []}.
 ```
 
 You can provide your own handler's by implementing **gen_event**
