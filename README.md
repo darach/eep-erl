@@ -71,12 +71,12 @@ Periodic windows and monotonic windows are created similarly:
 
 ```
 %% periodic
-OneMilli = eep_window_periodic:start(eep_stats_sum, 1),
-OneHunMillis = eep_window_periodic:start(eep_stats_avg, 100),
-OneSec - eep_window_periodic:start(eep_stats_vars, 1000),
+OneMilli = eep_window_periodic:start(eep_stats_sum, 1).
+OneHunMillis = eep_window_periodic:start(eep_stats_avg, 100).
+OneSec = eep_window_periodic:start(eep_stats_vars, 1000).
 
 %% monotonic
-Mono = eep_window_monotonic(eep_stats_stdevs, eep_clock_count, 1).
+Mono = eep_window_monotonic:start(eep_stats_stdevs, eep_clock_count, 1).
 ```
 
 But usage differs. For clock driven windows a clock tick needs to be
