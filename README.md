@@ -61,10 +61,11 @@ to the first emission.
 You might use a sliding window as follows.
 
 ```
-P = eep_window_sliding(eep_stats_sum, 4),
-P ! {add_handler, eep_emit_trace, []),
-[ P ! {push X} || X <- lists:seq(1,24)].
+P = eep_window_sliding:start(eep_stats_sum, 4).
+P ! {add_handler, eep_emit_trace, []}.
+[ P ! {push, X} || X <- lists:seq(1,24)].
 ```
+(You might need to 'forget' P with ```f(P).``` if you are continuing from the previous example.)
 
 Periodic windows and monotonic windows are created similarly:
 
