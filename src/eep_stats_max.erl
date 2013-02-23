@@ -28,6 +28,9 @@
 
 
 -include_lib("eep_erl.hrl").
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
 
 -behaviour(eep_aggregate).
 

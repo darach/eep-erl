@@ -27,6 +27,9 @@
 -module(eep_window_sliding).
 
 -include_lib("eep_erl.hrl").
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
 
 -export([start/2]).
 
