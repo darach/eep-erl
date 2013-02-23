@@ -1,0 +1,119 @@
+<html>
+<head><title>.eunit/eep_window_monotonic.COVER.html</title></head><body bgcolor=white text=black>
+<pre>
+File generated from /Users/morton_swimmer/Projects/eep-erl/.eunit/eep_window_monotonic.erl by COVER 2013-02-23 at 18:38:22
+
+****************************************************************************
+
+        |  %% -------------------------------------------------------------------
+        |  %% Copyright (c) 2013 Darach Ennis &lt; darach at gmail dot com &gt; 
+        |  %%
+        |  %% Permission is hereby granted, free of charge, to any person obtaining a
+        |  %% copy of this software and associated documentation files (the
+        |  %% "Software"), to deal in the Software without restriction, including
+        |  %% without limitation the rights to use, copy, modify, merge, publish,
+        |  %% distribute, sublicense, and/or sell copies of the Software, and to permit
+        |  %% persons to whom the Software is furnished to do so, subject to the
+        |  %% following conditions:
+        |  %%
+        |  %% The above copyright notice and this permission notice shall be included
+        |  %% in all copies or substantial portions of the Software.
+        |  %%
+        |  %% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+        |  %% OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+        |  %% MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+        |  %% NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+        |  %% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+        |  %% OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+        |  %% USE OR OTHER DEALINGS IN THE SOFTWARE.
+        |  %%
+        |  %% File: eep_window_monotonic.erl. Monotonic window.
+        |  %%
+        |  %% -------------------------------------------------------------------
+        |  
+        |  -module(eep_window_monotonic).
+        |  
+        |  -include_lib("eep_erl.hrl").
+        |  
+        |  -export([start/3]).
+        |  
+        |  %% @private
+        |  -export([tock/4]).
+        |  
+        |  start(Mod, ClockMod, Interval) -&gt;
+     1..|    {ok, EventPid } = gen_event:start_link(),
+     1..|    {_, Clock} = apply(ClockMod,tick,[apply(ClockMod,new, [Interval])]),
+     1..|    spawn(?MODULE, tock, [Mod, ClockMod, Clock, EventPid]).
+        |  
+        |  %% @private
+        |  tock(Mod, ClockMod, Clock, EventPid) -&gt;
+     1..|    tock(Mod, ClockMod, Clock, EventPid, apply(Mod, init, [])).
+        |  
+        |  %% @private
+        |  tock(Mod, ClockMod, Clock, EventPid, State) -&gt;
+    15..|    receive
+        |      tick -&gt;
+     2..|        { Ticked, Tocked } =  apply(ClockMod,tick,[Clock]),
+     2..|        case Ticked of
+        |          true -&gt;
+     2..|            case apply(ClockMod, tock, [Tocked, apply(ClockMod,at,[Tocked])]) of
+        |              {true, Clock1} -&gt;
+     2..|                gen_event:notify(EventPid, {emit, apply(Mod, emit, [State])}),
+     2..|                tock(Mod, ClockMod, Clock1, EventPid, apply(Mod, init, []));
+        |              {false, _Clock1} -&gt;
+<font color=red>     0..|                tock(Mod, ClockMod, Tocked, EventPid, State)</font>
+        |            end;
+        |          false -&gt;
+<font color=red>     0..|            tock(Mod, ClockMod, Clock, EventPid, State)</font>
+        |        end;
+        |      { push, Event } -&gt;
+     8..|        tock(Mod, ClockMod, apply(ClockMod,inc,[Clock]), EventPid, apply(Mod, accumulate, [State, Event]));
+        |      { add_handler, Handler, Arr } -&gt;
+<font color=red>     0..|        gen_event:add_handler(EventPid, Handler, Arr),</font>
+<font color=red>     0..|        tock(Mod, ClockMod, Clock, EventPid, State);</font>
+        |      { delete_handler, Handler } -&gt;
+<font color=red>     0..|        gen_event:delete_handler(EventPid, Handler),</font>
+<font color=red>     0..|        tock(Mod, ClockMod, Clock, EventPid, State);</font>
+        |      stop -&gt;
+     1..|        ok;
+        |      {debug, From} -&gt;
+     4..|        From ! { debug, {Mod, Clock, EventPid, State}},
+     4..|        tock(Mod, ClockMod, Clock, EventPid, State)
+        |    end.
+        |  
+        |  -ifdef(TEST).
+        |  
+        |  basic_test() -&gt;
+     1..|    Pid = start(eep_stats_count, eep_clock_count, 0),
+     1..|    Pid ! {push, foo},
+     1..|    Pid ! {push, bar},
+     1..|    Pid ! {debug, self()},
+     1..|    receive
+     1..|      { debug, Debug0 } -&gt; {eep_stats_count, _, _, 2} = Debug0
+        |    end,
+     1..|    Pid ! tick,
+     1..|    Pid ! {debug, self()},
+     1..|    receive
+     1..|       { debug, Debug1 } -&gt; {eep_stats_count, _, _, 0} = Debug1
+        |    end,
+     1..|    Pid ! {push, foo},
+     1..|    Pid ! {push, bar},
+     1..|    Pid ! {push, foo},
+     1..|    Pid ! {push, bar},
+     1..|    Pid ! {push, foo},
+     1..|    Pid ! {push, bar},
+     1..|    Pid ! {debug, self()},
+     1..|    receive
+     1..|      { debug, Debug2 } -&gt; {eep_stats_count, _, _, 6} = Debug2
+        |    end,
+     1..|    Pid ! tick,
+     1..|    Pid ! {debug, self()},
+     1..|    receive
+     1..|       { debug, Debug3 } -&gt; {eep_stats_count, _, _, 0} = Debug3
+        |    end,
+     1..|    Pid ! stop.
+        |  
+        |  -endif.
+</pre>
+</body>
+</html>

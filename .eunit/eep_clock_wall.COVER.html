@@ -1,0 +1,103 @@
+<html>
+<head><title>.eunit/eep_clock_wall.COVER.html</title></head><body bgcolor=white text=black>
+<pre>
+File generated from /Users/morton_swimmer/Projects/eep-erl/.eunit/eep_clock_wall.erl by COVER 2013-02-23 at 18:38:22
+
+****************************************************************************
+
+        |  %% -------------------------------------------------------------------
+        |  %% Copyright (c) 2013 Darach Ennis &lt; darach at gmail dot com &gt; 
+        |  %%
+        |  %% Permission is hereby granted, free of charge, to any person obtaining a
+        |  %% copy of this software and associated documentation files (the
+        |  %% "Software"), to deal in the Software without restriction, including
+        |  %% without limitation the rights to use, copy, modify, merge, publish,
+        |  %% distribute, sublicense, and/or sell copies of the Software, and to permit
+        |  %% persons to whom the Software is furnished to do so, subject to the
+        |  %% following conditions:
+        |  %%
+        |  %% The above copyright notice and this permission notice shall be included
+        |  %% in all copies or substantial portions of the Software.
+        |  %%
+        |  %% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+        |  %% OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+        |  %% MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+        |  %% NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+        |  %% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+        |  %% OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+        |  %% USE OR OTHER DEALINGS IN THE SOFTWARE.
+        |  %%
+        |  %% File: eep_clock_wall.erl. Wall clock, erlang:now/0 based, millisecond
+        |  %% tick resolution.
+        |  %%
+        |  %% -------------------------------------------------------------------
+        |  
+        |  -module(eep_clock_wall).
+        |  
+        |  -include_lib("eep_erl.hrl").
+        |  
+        |  -behaviour(eep_clock).
+        |  
+        |  %% clock behaviour.
+        |  -export([name/0]).
+        |  -export([at/1]).
+        |  -export([new/1]).
+        |  -export([inc/1]).
+        |  -export([tick/1]).
+        |  -export([tock/2]).
+        |  
+        |  %% impl
+        |  -export([ts/0]).
+        |  
+<font color=red>     0..|  name() -&gt; crock.</font>
+        |  
+        |  at(State) -&gt; 
+<font color=red>     0..|   State#eep_clock.at.</font>
+        |  
+        |  new(Interval) -&gt;
+     2..|    #eep_clock{at = ts(), interval = Interval}.
+        |  
+        |  inc(State) -&gt; 
+     9..|    State#eep_clock{at = ts()}.
+        |  
+        |  tick(State) -&gt;
+     4..|    NewState = case State#eep_clock.mark of
+     2..|      undefined -&gt; State#eep_clock{mark = State#eep_clock.at};
+     2..|      _Other -&gt; State
+        |    end,
+     4..|    {(NewState#eep_clock.at - NewState#eep_clock.mark) &gt;= NewState#eep_clock.interval, NewState}.
+        |  
+        |  tock(State, Elapsed) -&gt;
+     3..|    Delta = State#eep_clock.at - Elapsed,
+     3..|    case Delta &gt;= State#eep_clock.interval of
+     2..|      true -&gt; {true, State#eep_clock{mark = State#eep_clock.mark + State#eep_clock.interval}};
+     1..|      false -&gt; {false, State}
+        |    end.
+        |  
+        |  ts() -&gt;
+    16..|    {MegaSecs,Secs,MicroSecs} = erlang:now(),
+    16..|    erlang:round((MegaSecs*1000000 + Secs)*1000 + (MicroSecs/1000)).
+        |  
+        |  -ifdef(TEST).
+        |  
+        |  basic_test() -&gt;
+     1..|    C0 = new(1),
+     1..|    timer:sleep(1),
+     1..|    Then0 = ts(),
+     1..|    case ((Then0 - C0#eep_clock.at) &gt;= 1) of
+     1..|      true -&gt; ok
+        |    end,
+     1..|    timer:sleep(1),
+     1..|    C1 = inc(C0),
+     1..|    case (C1#eep_clock.at - Then0) &gt;= 1 of
+     1..|      true -&gt; ok
+        |    end,
+     1..|    At0 = C1#eep_clock.at,
+     1..|    {false,C2} = tick(C1),
+     1..|    {false,C3} = tock(C2,ts() + 1),
+     1..|    ?assertEqual(At0, C3#eep_clock.mark).
+        |    
+        |  -endif.
+</pre>
+</body>
+</html>
