@@ -22,7 +22,11 @@
 %%
 %% File: eep_window_monotonic.erl. Monotonic window.
 %%
-%% -------------------------------------------------------------------
+%%--------------------------------------------------------------------
+%% @doc
+%% A monotonic window. Client should call tick monotonically and use with a monotonic clock implementation.
+%% @end
+%%--------------------------------------------------------------------
 
 -module(eep_window_monotonic).
 
@@ -33,77 +37,92 @@
 %% @private
 -export([tock/4]).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Start the monotonic window with the given conflation module, Mod, the
+%% given clock module, ClockMod, and the given clock Interval.
+%% @end
+%%--------------------------------------------------------------------
+
+-spec start(Mod::module(), ClockMod::integer(), Interval::integer()) -> pid().
+
 start(Mod, ClockMod, Interval) ->
-  {ok, EventPid } = gen_event:start_link(),
-  {_, Clock} = apply(ClockMod,tick,[apply(ClockMod,new, [Interval])]),
-  spawn(?MODULE, tock, [Mod, ClockMod, Clock, EventPid]).
+    {ok, EventPid } = gen_event:start_link(),
+    {_, Clock} = apply(ClockMod,tick,[apply(ClockMod,new, [Interval])]),
+    spawn(?MODULE, tock, [Mod, ClockMod, Clock, EventPid]).
 
 %% @private
 tock(Mod, ClockMod, Clock, EventPid) ->
-  tock(Mod, ClockMod, Clock, EventPid, apply(Mod, init, [])).
+    tock(Mod, ClockMod, Clock, EventPid, apply(Mod, init, [])).
 
 %% @private
 tock(Mod, ClockMod, Clock, EventPid, State) ->
-  receive
-    tick ->
-      { Ticked, Tocked } =  apply(ClockMod,tick,[Clock]),
-      case Ticked of
-        true ->
-          case apply(ClockMod, tock, [Tocked, apply(ClockMod,at,[Tocked])]) of
-            {true, Clock1} ->
-              gen_event:notify(EventPid, {emit, apply(Mod, emit, [State])}),
-              tock(Mod, ClockMod, Clock1, EventPid, apply(Mod, init, []));
-            {false, _Clock1} ->
-              tock(Mod, ClockMod, Tocked, EventPid, State)
-          end;
-        false ->
-          tock(Mod, ClockMod, Clock, EventPid, State)
-      end;
-    { push, Event } ->
-      tock(Mod, ClockMod, apply(ClockMod,inc,[Clock]), EventPid, apply(Mod, accumulate, [State, Event]));
-    { add_handler, Handler, Arr } ->
-      gen_event:add_handler(EventPid, Handler, Arr),
-      tock(Mod, ClockMod, Clock, EventPid, State);
-    { delete_handler, Handler } ->
-      gen_event:delete_handler(EventPid, Handler),
-      tock(Mod, ClockMod, Clock, EventPid, State);
-    stop ->
-      ok;
-    {debug, From} ->
-      From ! { debug, {Mod, Clock, EventPid, State}},
-      tock(Mod, ClockMod, Clock, EventPid, State)
-  end.
+    receive
+	tick ->
+	    { Ticked, Tocked } =  apply(ClockMod,tick,[Clock]),
+	    case Ticked of
+		true ->
+		    case apply(ClockMod, tock, [Tocked, apply(ClockMod,at,[Tocked])]) of
+			{true, Clock1} ->
+			    gen_event:notify(EventPid, {emit, apply(Mod, emit, [State])}),
+			    tock(Mod, ClockMod, Clock1, EventPid, apply(Mod, init, []));
+			{false, _Clock1} ->
+			    tock(Mod, ClockMod, Tocked, EventPid, State)
+		    end;
+		false ->
+		    tock(Mod, ClockMod, Clock, EventPid, State)
+	    end;
+	{ push, Event } ->
+	    tock(Mod, ClockMod, apply(ClockMod,inc,[Clock]), EventPid, apply(Mod, accumulate, [State, Event]));
+	{ add_handler, Handler, Arr } ->
+	    gen_event:add_handler(EventPid, Handler, Arr),
+	    tock(Mod, ClockMod, Clock, EventPid, State);
+	{ delete_handler, Handler } ->
+	    gen_event:delete_handler(EventPid, Handler),
+	    tock(Mod, ClockMod, Clock, EventPid, State);
+	stop ->
+	    ok;
+	{debug, From} ->
+	    From ! { debug, {Mod, Clock, EventPid, State}},
+	    tock(Mod, ClockMod, Clock, EventPid, State)
+    end.
+
+%%--------------------------------------------------------------------
+%% 
+%% EUnit tests
+%% 
+%%--------------------------------------------------------------------
 
 -ifdef(TEST).
 
 basic_test() ->
-  Pid = start(eep_stats_count, eep_clock_count, 0),
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {debug, self()},
-  receive
-    { debug, Debug0 } -> {eep_stats_count, _, _, 2} = Debug0
-  end,
-  Pid ! tick,
-  Pid ! {debug, self()},
-  receive
-     { debug, Debug1 } -> {eep_stats_count, _, _, 0} = Debug1
-  end,
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {debug, self()},
-  receive
-    { debug, Debug2 } -> {eep_stats_count, _, _, 6} = Debug2
-  end,
-  Pid ! tick,
-  Pid ! {debug, self()},
-  receive
-     { debug, Debug3 } -> {eep_stats_count, _, _, 0} = Debug3
-  end,
-  Pid ! stop.
+    Pid = start(eep_stats_count, eep_clock_count, 0),
+    Pid ! {push, foo},
+    Pid ! {push, bar},
+    Pid ! {debug, self()},
+    receive
+	{ debug, Debug0 } -> {eep_stats_count, _, _, 2} = Debug0
+    end,
+    Pid ! tick,
+    Pid ! {debug, self()},
+    receive
+	{ debug, Debug1 } -> {eep_stats_count, _, _, 0} = Debug1
+    end,
+    Pid ! {push, foo},
+    Pid ! {push, bar},
+    Pid ! {push, foo},
+    Pid ! {push, bar},
+    Pid ! {push, foo},
+    Pid ! {push, bar},
+    Pid ! {debug, self()},
+    receive
+	{ debug, Debug2 } -> {eep_stats_count, _, _, 6} = Debug2
+    end,
+    Pid ! tick,
+    Pid ! {debug, self()},
+    receive
+	{ debug, Debug3 } -> {eep_stats_count, _, _, 0} = Debug3
+    end,
+    Pid ! stop.
 
 -endif.
