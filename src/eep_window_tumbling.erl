@@ -41,7 +41,16 @@
 %% <p>So, we only ever need 1 active window to emit a result for every set of N input events.</p>
 %% 
 %% <p>This is the only window implementation that actually needs a queue (ring buffer)
-%% in this simple embedded event processing engine.</p>             
+%% in this simple embedded event processing engine.</p>
+%%
+%% <p>You can send the following messages to this window:</p>
+%% <ul>
+%% <li>{ push, Event } - Push an event to the handler.</li>
+%% <li>{ add_handler, Handler, Arr }</li>
+%% <li>{ delete_handler, Handler }</li>
+%% <li>stop - exits (what did you think it would do?)</li>
+%% <li>{debug, From}</li>
+%% </ul>
 %% @end
 %%--------------------------------------------------------------------
 
@@ -69,9 +78,6 @@ start(Mod, Size) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Private function for conflating the events with Mod, a module of behavior eep_aggregate, 
-%% Size, the tumbling window size, 
-%% EventPid, the initial gen_event event handler to register.
 %% @end
 %%--------------------------------------------------------------------
 

@@ -39,25 +39,26 @@
 init() ->
   0.
 
-accumulate(State,_X) ->
-  State + 1.
+accumulate(State, _X) ->
+    State + 1.
 
-  State - 1.
+compensate(State, _X) ->
+    State - 1.
 
 emit(State) ->
-  State.
+    State.
 
 -ifdef(TEST).
 
 basic_test() ->
-  S0 = init(),
-  ?assertEqual(0, S0),
-  S1 = accumulate(S0, 1),
-  ?assertEqual(1, S1),
-  S2 = accumulate(S1, 8),
-  ?assertEqual(2, S2),
-  ?assertEqual(2, emit(S2)),
-  S3 = compensate(S2, 100),
-  ?assertEqual(1, emit(S3)).
+    S0 = init(),
+    ?assertEqual(0, S0),
+    S1 = accumulate(S0, 1),
+    ?assertEqual(1, S1),
+    S2 = accumulate(S1, 8),
+    ?assertEqual(2, S2),
+    ?assertEqual(2, emit(S2)),
+    S3 = compensate(S2, 100),
+    ?assertEqual(1, emit(S3)).
 
 -endif.
