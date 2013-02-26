@@ -42,7 +42,6 @@ init() ->
 accumulate(State,_X) ->
   State + 1.
 
-compensate(State,_x) ->
   State - 1.
 
 emit(State) ->
