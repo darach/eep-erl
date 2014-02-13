@@ -1,4 +1,4 @@
-# **eep.erl**
+# **eep.erl**  [![Build Status](https://travis-ci.org/darach/eep-erl.png)](https://travis-ci.org/darach/eep-erl)
 
 > Embedding Event Processing for Erlang
 

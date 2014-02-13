@@ -2,7 +2,7 @@ REBAR:=rebar
 
 .PHONY: all erl test clean doc 
 
-all: erl
+all: test
 
 erl:
 	$(REBAR) get-deps compile
