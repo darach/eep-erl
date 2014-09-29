@@ -62,21 +62,3 @@ tock(State, _Elapsed) ->
     true -> {true, State#eep_clock{mark = State#eep_clock.mark + State#eep_clock.interval}};
     false -> {false, State}
   end.
-
--ifdef(TEST).
-
-basic_test() ->
-  C0 = new(1),
-  Then0 = 0,
-  case (Then0 - C0#eep_clock.at) =:= 0 of
-    true -> ok
-  end,
-  C1 = inc(C0),
-  case (C1#eep_clock.at - Then0) =:= 1 of
-    true -> ok
-  end,
-  {false,C2} = tick(C1),
-  {true,C3} = tock(C2,1),
-  ?assertEqual(2, C3#eep_clock.mark).
-
--endif.

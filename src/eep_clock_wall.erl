@@ -48,17 +48,16 @@ at(State) ->
  State#eep_clock.at.
 
 new(Interval) ->
-  #eep_clock{at = ts(), interval = Interval}.
+  At = ts(),
+  Mark = At + Interval,
+  #eep_clock{at = At, interval = Interval, mark=Mark}.
 
 inc(State) -> 
   State#eep_clock{at = ts()}.
 
 tick(State) ->
-  NewState = case State#eep_clock.mark of
-    undefined -> State#eep_clock{mark = State#eep_clock.at};
-    _Other -> State
-  end,
-  {(NewState#eep_clock.at - NewState#eep_clock.mark) >= NewState#eep_clock.interval, NewState}.
+  NewState = inc(State),
+  {(NewState#eep_clock.at - NewState#eep_clock.mark) >= 0, NewState}.
 
 tock(State, Elapsed) ->
   Delta = State#eep_clock.at - Elapsed,
@@ -70,24 +69,3 @@ tock(State, Elapsed) ->
 ts() ->
   {MegaSecs,Secs,MicroSecs} = erlang:now(),
   erlang:round((MegaSecs*1000000 + Secs)*1000 + (MicroSecs/1000)).
-
--ifdef(TEST).
-
-basic_test() ->
-  C0 = new(1),
-  timer:sleep(1),
-  Then0 = ts(),
-  case ((Then0 - C0#eep_clock.at) >= 1) of
-    true -> ok
-  end,
-  timer:sleep(1),
-  C1 = inc(C0),
-  case (C1#eep_clock.at - Then0) >= 1 of
-    true -> ok
-  end,
-  At0 = C1#eep_clock.at,
-  {false,C2} = tick(C1),
-  {false,C3} = tock(C2,ts() + 1),
-  ?assertEqual(At0, C3#eep_clock.mark).
-  
--endif.

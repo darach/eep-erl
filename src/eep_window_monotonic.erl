@@ -33,9 +33,21 @@
 -include_lib("eep_erl.hrl").
 
 -export([start/3]).
+-export([new/4]).
+-export([tick/1]).
+-export([push/2]).
 
-%% @private
--export([tock/4]).
+-export([loop/1]).
+
+-record(state, {
+    interval :: integer(),
+    mod :: module(),
+    clock_mod :: module(),
+    clock,
+    aggregate :: any(),
+    callback = undefined :: fun((...) -> any()),
+    pid = undefined :: pid() | undefined
+}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -48,81 +60,64 @@
 
 start(Mod, ClockMod, Interval) ->
     {ok, EventPid } = gen_event:start_link(),
-    {_, Clock} = apply(ClockMod,tick,[apply(ClockMod,new, [Interval])]),
-    spawn(?MODULE, tock, [Mod, ClockMod, Clock, EventPid]).
+    CallbackFun = fun(NewAggregate) ->
+        gen_event:notify(
+            EventPid,
+            {emit, apply(Mod, emit, [NewAggregate])}
+        )
+    end,
+    {_, Clock} = ClockMod:tick(ClockMod:new(Interval)),
+   spawn(?MODULE, loop, [#state{mod=Mod, clock_mod=ClockMod, clock=Clock, pid=EventPid, aggregate=apply(Mod,init,[]), callback=CallbackFun}]).
 
-%% @private
-tock(Mod, ClockMod, Clock, EventPid) ->
-    tock(Mod, ClockMod, Clock, EventPid, apply(Mod, init, [])).
+-spec new(Mod::module(), ClockMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
+new(Mod, ClockMod, CallbackFun, Interval) ->
+    {_, Clock} = ClockMod:tick(ClockMod:new(Interval)),
+    #state{mod=Mod, clock_mod=ClockMod, clock=Clock, aggregate=apply(Mod,init,[]), callback=CallbackFun}.
 
-%% @private
-tock(Mod, ClockMod, Clock, EventPid, State) ->
-    receive
-	tick ->
-	    { Ticked, Tocked } =  apply(ClockMod,tick,[Clock]),
-	    case Ticked of
+-spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
+push(State, Event) ->
+    accum(State,Event).
+   
+%% @private. 
+loop(#state{pid=EventPid}=State) ->
+  receive
+    tick ->
+      {_,NewState} = tick(State),
+      loop(NewState);
+    { push, Event } ->
+      {_,NewState} = accum(State,Event),
+      loop(NewState);
+    { add_handler, Handler, Arr } ->
+      gen_event:add_handler(EventPid, Handler, Arr),
+      loop(State);
+    { delete_handler, Handler } ->
+      gen_event:delete_handler(EventPid, Handler),
+      loop(State);
+    stop ->
+      ok;
+    {debug, From} ->
+      From ! {debug, State},
+      loop(State)
+  end.
+
+accum(#state{mod=Mod, clock_mod=ClockMod, clock=Clock, aggregate=Agg}=State,Event) ->
+    {noop, State#state{
+        mod=Mod,
+        clock=ClockMod:inc(Clock),
+        aggregate=Mod:accumulate(Agg, Event)
+    }}.
+
+tick(#state{mod=Mod, aggregate=Agg, clock_mod=ClockMod, clock=Clock, callback=CallbackFun}=State) ->
+	{ Ticked, Tocked } =  apply(ClockMod,tick,[Clock]),
+	case Ticked of
 		true ->
-		    case apply(ClockMod, tock, [Tocked, apply(ClockMod,at,[Tocked])]) of
+		    case ClockMod:tock(Tocked, ClockMod:at(Tocked)) of
 			{true, Clock1} ->
-			    gen_event:notify(EventPid, {emit, apply(Mod, emit, [State])}),
-			    tock(Mod, ClockMod, Clock1, EventPid, apply(Mod, init, []));
+                CallbackFun(Agg),
+                {emit,State#state{aggregate=apply(Mod,init,[]),clock=ClockMod:inc(Clock1)}};
 			{false, _Clock1} ->
-			    tock(Mod, ClockMod, Tocked, EventPid, State)
+                {noop,State#state{aggregate=apply(Mod,init,[]),clock=Tocked}}
 		    end;
 		false ->
-		    tock(Mod, ClockMod, Clock, EventPid, State)
-	    end;
-	{ push, Event } ->
-	    tock(Mod, ClockMod, apply(ClockMod,inc,[Clock]), EventPid, apply(Mod, accumulate, [State, Event]));
-	{ add_handler, Handler, Arr } ->
-	    gen_event:add_handler(EventPid, Handler, Arr),
-	    tock(Mod, ClockMod, Clock, EventPid, State);
-	{ delete_handler, Handler } ->
-	    gen_event:delete_handler(EventPid, Handler),
-	    tock(Mod, ClockMod, Clock, EventPid, State);
-	stop ->
-	    ok;
-	{debug, From} ->
-	    From ! { debug, {Mod, Clock, EventPid, State}},
-	    tock(Mod, ClockMod, Clock, EventPid, State)
-    end.
-
-%%--------------------------------------------------------------------
-%% 
-%% EUnit tests
-%% 
-%%--------------------------------------------------------------------
-
--ifdef(TEST).
-
-basic_test() ->
-    Pid = start(eep_stats_count, eep_clock_count, 0),
-    Pid ! {push, foo},
-    Pid ! {push, bar},
-    Pid ! {debug, self()},
-    receive
-	{ debug, Debug0 } -> {eep_stats_count, _, _, 2} = Debug0
-    end,
-    Pid ! tick,
-    Pid ! {debug, self()},
-    receive
-	{ debug, Debug1 } -> {eep_stats_count, _, _, 0} = Debug1
-    end,
-    Pid ! {push, foo},
-    Pid ! {push, bar},
-    Pid ! {push, foo},
-    Pid ! {push, bar},
-    Pid ! {push, foo},
-    Pid ! {push, bar},
-    Pid ! {debug, self()},
-    receive
-	{ debug, Debug2 } -> {eep_stats_count, _, _, 6} = Debug2
-    end,
-    Pid ! tick,
-    Pid ! {debug, self()},
-    receive
-	{ debug, Debug3 } -> {eep_stats_count, _, _, 0} = Debug3
-    end,
-    Pid ! stop.
-
--endif.
+		    {noop,State}
+	end.

@@ -59,9 +59,20 @@
 -include_lib("eep_erl.hrl").
 
 -export([start/2]).
+-export([new/3]).
+-export([push/2]).
 
 %% @private.
--export([tumble/3]).
+-export([loop/1]).
+
+-record(state, {
+    size :: integer(),
+    mod :: module(),
+    aggregate :: any(),
+    callback = undefined :: fun((...) -> any()),
+    count = 1 :: integer(),
+    pid :: pid()
+}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -74,77 +85,58 @@
 
 start(Mod, Size) ->
     {ok, EventPid } = gen_event:start_link(),
-    spawn(?MODULE, tumble, [Mod, Size, EventPid]).
+    CallbackFun = fun(NewAggregate) -> 
+        gen_event:notify(
+            EventPid,
+            {emit, apply(Mod, emit, [NewAggregate])}
+        )
+    end,
+    spawn(?MODULE, loop, [#state{mod=Mod, size=Size, pid=EventPid, count=1, aggregate=apply(Mod,init,[]), callback=CallbackFun}]).
 
+%%
+%%
+%%
+-spec new(Mod::module(), CallbackFun::fun((...) -> any()), Size::integer()) ->#state{}.
+new(Mod, CallbackFun, Size) ->
+    #state{size = Size, mod = Mod, callback = CallbackFun, aggregate=apply(Mod, init, [])}. 
+
+%%
+%%
+%%
+-spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
+push(State, Event) ->
+    tumble(State, Event).
+    
 %%--------------------------------------------------------------------
 %% @doc
 %% @end
 %%--------------------------------------------------------------------
 
--spec tumble(Mod::module(), Size::integer(), EventPid::pid()) -> ok.
-
-tumble(Mod, Size, EventPid) ->
-    tumble(Mod, Size, EventPid, 1, apply(Mod, init, [])).
-
-tumble(Mod, Size, EventPid, Count, State) ->
+-spec loop(State::#state{}) -> ok.
+loop(#state{pid=EventPid}=State) ->
     receive
 	{ push, Event } ->
-	    NewState = apply(Mod, accumulate, [State, Event]),
-	    case Count >= Size of
-		false ->
-		    tumble(Mod, Size, EventPid, Count+1, NewState);
-		true ->		   
-		    gen_event:notify(EventPid, {emit, apply(Mod, emit, [NewState])}),
-		    tumble(Mod, Size, EventPid, 1, apply(Mod, init, []))
-	    end;
+        {_,NewState} = tumble(State,Event),
+        loop(NewState);
 	{ add_handler, Handler, Arr } ->
 	    gen_event:add_handler(EventPid, Handler, Arr),
-	    tumble(Mod, Size, EventPid, Count, State);
+	    loop(State);
 	{ delete_handler, Handler } ->
 	    gen_event:delete_handler(EventPid, Handler),
-	    tumble(Mod, Size, EventPid, Count, State);
+	    loop(State);
 	stop ->
 	    ok;
 	{debug, From} ->
-	    From ! {debug, {Mod, Size, Count, State}},
-	    tumble(Mod, Size, EventPid, Count, State)
+	    From ! {debug, State},
+	    loop(State)
     end.
 
-%%--------------------------------------------------------------------
-%% 
-%% EUnit tests
-%% 
-%%--------------------------------------------------------------------
+tumble(#state{mod=Mod, size=Size, aggregate=Aggregate,count=Count,callback=CallbackFun}=State,Event) ->
+	NewAggregate = apply(Mod, accumulate, [Aggregate, Event]),
+	case Count >= Size of
+	false -> {noop,State#state{aggregate=NewAggregate,count=Count+1}};
+	true ->	
+        CallbackFun(NewAggregate),
+        {emit,State#state{aggregate=apply(Mod, init, []),count=1}}
+	end.
 
--ifdef(TEST).
-
-basic_test() ->
-    Pid = start(eep_stats_count, 2),
-    Pid ! {push, foo},
-    Pid ! {push, bar},
-    Pid ! {debug, self()},
-    receive
-	{ debug, Debug0 } -> {eep_stats_count, _, _, 0} = Debug0
-    end,
-    Pid ! {push, baz},
-    Pid ! {debug, self()},
-    receive
-	{ debug, Debug1 } -> {eep_stats_count, _, _, 1} = Debug1
-    end,
-    Pid ! {push, foo},
-    Pid ! {push, bar},
-    Pid ! {push, foo},
-    Pid ! {push, bar},
-    Pid ! {push, foo},
-    Pid ! {push, bar},
-    Pid ! {debug, self()},
-    receive
-	{ debug, Debug2 } -> {eep_stats_count, _, _, 1} = Debug2
-    end,
-    Pid ! {debug, self()},
-    receive
-	{ debug, Debug3 } -> {eep_stats_count, _, _, 1} = Debug3
-    end,
-    Pid ! stop.
-
--endif.

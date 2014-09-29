@@ -29,81 +29,84 @@
 -include_lib("eep_erl.hrl").
 
 -export([start/2]).
+-export([new/3]).
+-export([tick/1]).
+-export([push/2]).
 
-%% @private.
--export([tock/3]).
+-export([loop/1]).
+
+-record(state, {
+    interval :: integer(),
+    mod :: module(),
+    clock,
+    aggregate :: any(),
+    callback = undefined :: fun((...) -> any()),
+    pid :: pid(),
+    epoch :: integer()
+}).
 
 start(Mod, Interval) ->
-  {ok, EventPid } = gen_event:start_link(),
+    {ok, EventPid } = gen_event:start_link(),
+    CallbackFun = fun(NewAggregate) ->
+        gen_event:notify(
+            EventPid,
+            {emit, apply(Mod, emit, [NewAggregate])}
+        )
+    end,
+
   {_, Clock} = eep_clock_wall:tick(eep_clock_wall:new(Interval)),
-  spawn(?MODULE, tock, [Mod, Clock, EventPid]).
+  spawn(?MODULE, loop, [#state{mod=Mod, clock=Clock, pid=EventPid, aggregate=apply(Mod,init,[]), callback=CallbackFun, epoch=eep_clock_wall:ts()}]).
+
+-spec new(Mod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
+new(Mod, CallbackFun, Interval) ->
+    {_, Clock} = eep_clock_wall:tick(eep_clock_wall:new(Interval)),
+    #state{mod=Mod, clock=Clock, aggregate=apply(Mod,init,[]), callback=CallbackFun, epoch=eep_clock_wall:ts()}.
+
+-spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
+push(State, Event) ->
+    accum(State, Event).
 
 %% @private.
-tock(Mod, Clock, EventPid) ->
-  tock(Mod, Clock, EventPid, apply(Mod, init, []), eep_clock_wall:ts()).
-
-%% @private.
-tock(Mod, Clock, EventPid, State, Epoch) ->
+loop(#state{pid=EventPid}=State) ->
   receive
     tick ->
-      { Ticked, Tocked } =  eep_clock_wall:tick(Clock),
-      case Ticked of
-        true ->
-          case eep_clock_wall:tock(Tocked,Epoch) of
-            {true, Clock1} ->
-              gen_event:notify(EventPid, {emit, apply(Mod, emit, [State])}),
-              tock(Mod, Clock1, EventPid, apply(Mod, init, []), eep_clock_wall:ts());
-            {false, _Clock1} ->
-              tock(Mod, Tocked, EventPid, State, Epoch)
-          end;
-        false ->
-          tock(Mod, Tocked, EventPid, State, Epoch)
-      end;
+      {_,NewState} = tick(State),
+      loop(NewState);
     { push, Event } ->
-      tock(Mod, eep_clock_wall:inc(Clock), EventPid, apply(Mod, accumulate, [State, Event]), Epoch);
+      {_,NewState} = accum(State,Event),
+      loop(NewState);
     { add_handler, Handler, Arr } ->
       gen_event:add_handler(EventPid, Handler, Arr),
-      tock(Mod, Clock, EventPid, State, Epoch);
+      loop(State);
     { delete_handler, Handler } ->
       gen_event:delete_handler(EventPid, Handler),
-      tock(Mod, Clock, EventPid, State, Epoch);
+      loop(State);
     stop ->
       ok;
     {debug, From} ->
-      From ! { debug, {Mod, Clock, EventPid, State}},
-      tock(Mod, Clock, EventPid, State, Epoch)
+      From ! {debug, State},
+      loop(State)
   end.
 
--ifdef(TEST).
+accum(#state{mod=Mod, clock=Clock, aggregate=Agg}=State,Event) ->
+    {noop, State#state{
+        mod=Mod,
+        clock=eep_clock_wall:inc(Clock),
+        aggregate=apply(Mod, accumulate, [Agg, Event])
+    }}.
 
-basic_test() ->
-  Pid = start(eep_stats_count, 0),
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {debug, self()},
-  receive
-    { debug, Debug0 } -> {eep_stats_count, _, _, 2} = Debug0
-  end,
-  Pid ! tick,
-  Pid ! {debug, self()},
-  receive
-     { debug, Debug1 } -> {eep_stats_count, _, _, 0} = Debug1
-  end,
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {debug, self()},
-  receive
-    { debug, Debug2 } -> {eep_stats_count, _, _, 6} = Debug2
-  end,
-  Pid ! tick,
-  Pid ! {debug, self()},
-  receive
-     { debug, Debug3 } -> {eep_stats_count, _, _, 0} = Debug3
-  end,
-  Pid ! stop.
-
--endif.
+tick(#state{mod=Mod, aggregate=Agg,clock=Clock,callback=CallbackFun,epoch=Epoch}=State) ->
+    { Ticked, Tocked } =  eep_clock_wall:tick(Clock),
+    case Ticked of
+        true ->
+            case eep_clock_wall:tock(Tocked,Epoch) of
+                {true, Clock1} ->
+                    CallbackFun(Agg),
+                    {emit,State#state{aggregate=apply(Mod,init,[]),clock=eep_clock_wall:inc(Clock1), epoch=eep_clock_wall:ts()}};
+                {false, _Clock1} ->
+                    {noop,State#state{aggregate=apply(Mod,init,[]),clock=Tocked, epoch=Epoch}}
+            end;
+        false ->
+            {noop,State}
+    end.
+    

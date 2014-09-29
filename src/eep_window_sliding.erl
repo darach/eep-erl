@@ -29,75 +29,75 @@
 -include_lib("eep_erl.hrl").
 
 -export([start/2]).
+-export([new/3]).
+-export([push/2]).
 
 %% private.
--export([slide/3]).
+-export([loop/1]).
+
+-record(state, {
+    size :: integer(),
+    mod :: module(),
+    aggregate :: any(),
+    callback = undefined :: fun((...) -> any()),
+    count = 1 :: integer(),
+    pid :: pid(),
+    prior = [] :: list()
+}).
 
 start(Mod, Size) ->
   {ok, EventPid } = gen_event:start_link(),
-  spawn(?MODULE, slide, [Mod, Size, EventPid]).
+  CallbackFun = fun(NewAggregate) -> 
+      gen_event:notify(
+          EventPid,
+          {emit, apply(Mod, emit, [NewAggregate])}
+      )
+  end,
+  spawn(?MODULE, loop, [#state{mod=Mod, size=Size, pid=EventPid, count=1, aggregate=apply(Mod,init,[]), callback=CallbackFun}]).
 
-slide(Mod, Size, EventPid) ->
-  slide(Mod, Size, EventPid, 1, apply(Mod, init, []), []).
+-spec new(Mod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
+new(Mod, CallbackFun, Size) ->
+    #state{size=Size, mod=Mod, callback=CallbackFun, aggregate=apply(Mod, init, [])}.
 
-slide(Mod, Size, EventPid, Count, State, Prior) ->
+push(State, Event) ->
+    slide(State, Event).
+
+-spec loop(State::#state{}) -> ok.
+loop(#state{pid=EventPid}=State) ->
   receive
     { push, Event } ->
-      case Count >= Size of
-        false -> 
-          NewState = apply(Mod, accumulate, [State, Event]),
-          Prior2 = Prior ++ [Event],
-          slide(Mod, Size, EventPid, Count+1, NewState, Prior2);
-        true ->
-           Value = lists:nth(1,Prior),
-		   NewState = apply(Mod, accumulate, [State, Event]),
-           gen_event:notify(EventPid, {emit, apply(Mod, emit, [NewState])}),
-           NewState2 = apply(Mod, compensate, [NewState, Value]),
-           Prior2 = lists:sublist(Prior,2,length(Prior)-1) ++ [Event],
-           slide(Mod, Size, EventPid, Count+1, NewState2, Prior2)
-      end;
+        {_,NewState} = slide(State,Event),
+        loop(NewState);
     { add_handler, Handler, Arr } ->
-      gen_event:add_handler(EventPid, Handler, Arr),
-      slide(Mod, Size, EventPid, Count, State, Prior);
+        gen_event:add_handler(EventPid, Handler, Arr),
+        loop(State);
     { delete_handler, Handler } ->
-      gen_event:delete_handler(EventPid, Handler),
-      slide(Mod, Size, EventPid, Count, State, Prior);
+        gen_event:delete_handler(EventPid, Handler),
+        loop(State);
     stop ->
       ok;
     {debug, From} ->
-      From ! {debug, {Mod, Size, Count, State}},
-      slide(Mod, Size, EventPid, Count, State, Prior)
+      From ! {debug, State},
+      loop(State)
   end.
 
--ifdef(TEST).
-
-basic_test() ->
-  Pid = start(eep_stats_count, 2),
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {debug, self()},
-  receive
-    { debug, Debug0 } -> {eep_stats_count, _, _, 1} = Debug0
-  end,
-  Pid ! {push, baz},
-  Pid ! {debug, self()},
-  receive
-     { debug, Debug1 } -> {eep_stats_count, _, _, 1} = Debug1
-  end,
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {push, foo},
-  Pid ! {push, bar},
-  Pid ! {debug, self()},
-  receive
-    { debug, Debug2 } -> {eep_stats_count, _, _, 1} = Debug2
-  end,
-  Pid ! {debug, self()},
-  receive
-     { debug, Debug3 } -> {eep_stats_count, _, _, 1} = Debug3
-  end,
-  Pid ! stop.
-
--endif.
+slide(#state{mod=Mod, size=Size, aggregate=Aggregate,count=Count,callback=CallbackFun,prior=Prior}=State,Event) ->
+    NewAggregate = apply(Mod, accumulate, [Aggregate, Event]),
+    if 
+        Count < Size ->
+            NewPrior = Prior ++ [Event],
+            {noop,State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
+        Count == Size ->
+            NewPrior = Prior ++ [Event],
+            CallbackFun(NewAggregate), 
+            {emit,State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
+        true ->
+            Value = lists:nth(1,Prior),
+            CallbackFun(NewAggregate), 
+            NewAggregate2 = apply(Mod, compensate, [NewAggregate, Value]),
+            ct:log("Prior: ~p Event: ~p", [Prior, Event]),
+            %NewPrior = lists:tl(Prior ++ [Event]),
+            %NewPrior = lists:sublist(Prior,2,Size-1) ++ [Event],
+            NewPrior = erlang:tl(Prior) ++ [Event],
+            {emit,State#state{aggregate=NewAggregate2,count=Count+1,prior=NewPrior}}
+    end.

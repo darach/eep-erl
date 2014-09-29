@@ -39,13 +39,13 @@
 init([]) ->
   {ok, []}.
  
-handle_event({emit, What}, State) ->
-  io:format("Emit: ~p~n", [What]),
-  {ok, State};
-
-handle_event(_, State) ->
-  io:format("Unknown event~n", []),
+handle_event(What, State) ->
+  io:format("Emit: ~p at ~p~n", [What, os:timestamp()]),
   {ok, State}.
+
+%handle_event(_, State) ->
+%  io:format("Unknown event~n", []),
+%  {ok, State}.
  
 handle_call(_, State) ->
   io:format("Unknown call~n", []),
