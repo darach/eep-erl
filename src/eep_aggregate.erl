@@ -29,7 +29,7 @@
 -export([behaviour_info/1]).
 
 behaviour_info(callbacks) ->
-  [ { init, 0} , { accumulate, 2}, {compensate, 2}, {emit, 1} ];
+  [ { init, 0} , { init, 1}, { accumulate, 2}, {compensate, 2}, {emit, 1} ];
 
 behaviour_info(_) ->
   undefined.

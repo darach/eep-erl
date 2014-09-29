@@ -32,12 +32,18 @@
 
 %% aggregate behaviour.
 -export([init/0]).
+-export([init/1]).
 -export([accumulate/2]).
 -export([compensate/2]).
 -export([emit/1]).
 
 init() ->
-  0.
+  init([0]).
+
+init([]) ->
+    init();
+init([Seed]) ->
+    Seed.
 
 accumulate(State,X) ->
   State + X.

@@ -33,12 +33,18 @@
 
 %% aggregate behaviour.
 -export([init/0]).
+-export([init/1]).
 -export([accumulate/2]).
 -export([compensate/2]).
 -export([emit/1]).
 
 init() ->
-  ?EEP_MAX.
+  init([?EEP_MAX]).
+
+init([]) ->
+  init();
+init([Seed]) ->
+  Seed.
 
 accumulate(State,X) ->
   case State =< X of true -> State; false -> X end.

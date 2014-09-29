@@ -32,11 +32,15 @@
 
 %% aggregate behaviour.
 -export([init/0]).
+-export([init/1]).
 -export([accumulate/2]).
 -export([compensate/2]).
 -export([emit/1]).
 
 init() ->
+  ok.
+
+init(_DontCare) ->
   ok.
 
 accumulate(_State, _X) ->

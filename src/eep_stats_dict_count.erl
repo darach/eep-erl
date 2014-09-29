@@ -36,6 +36,7 @@
 
 %% aggregate behaviour.
 -export([init/0]).
+-export([init/1]).
 -export([accumulate/2]).
 -export([compensate/2]).
 -export([emit/1]).
@@ -50,7 +51,19 @@
 -spec init() -> record().
 
 init() ->
-    #state{acc_dict = dict:new()}.
+    init([#state{acc_dict = dict:new()}]).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Initialize the dict counter with an existing dictionary.
+%% @end
+%%--------------------------------------------------------------------
+-spec init([#state{}]) -> record().
+
+init([]) ->
+  init();
+init([#state{}=Seed]) ->
+    Seed.
 
 %%--------------------------------------------------------------------
 %% @doc

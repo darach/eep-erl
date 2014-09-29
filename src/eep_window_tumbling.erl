@@ -60,6 +60,7 @@
 
 -export([start/2]).
 -export([new/3]).
+-export([new/4]).
 -export([push/2]).
 
 %% @private.
@@ -68,6 +69,7 @@
 -record(state, {
     size :: integer(),
     mod :: module(),
+    seed = [] :: list(),
     aggregate :: any(),
     callback = undefined :: fun((...) -> any()),
     count = 1 :: integer(),
@@ -88,18 +90,23 @@ start(Mod, Size) ->
     CallbackFun = fun(NewAggregate) -> 
         gen_event:notify(
             EventPid,
-            {emit, apply(Mod, emit, [NewAggregate])}
+            {emit, Mod:emit(NewAggregate)}
         )
     end,
-    spawn(?MODULE, loop, [#state{mod=Mod, size=Size, pid=EventPid, count=1, aggregate=apply(Mod,init,[]), callback=CallbackFun}]).
+    spawn(?MODULE, loop, [#state{mod=Mod, size=Size, pid=EventPid, count=1, aggregate=Mod:init(), callback=CallbackFun}]).
 
 %%
 %%
 %%
 -spec new(Mod::module(), CallbackFun::fun((...) -> any()), Size::integer()) ->#state{}.
 new(Mod, CallbackFun, Size) ->
-    #state{size = Size, mod = Mod, callback = CallbackFun, aggregate=apply(Mod, init, [])}. 
+    #state{size = Size, seed=[], mod = Mod, callback = CallbackFun, aggregate=Mod:init()}. 
 
+-spec new(Mod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Size::integer()) ->#state{}.
+new(Mod, Seed, CallbackFun, Size) ->
+    #state{size = Size, seed=Seed, mod = Mod, callback = CallbackFun, aggregate=Mod:init(Seed)}. 
+
+%%
 %%
 %%
 %%
@@ -131,12 +138,13 @@ loop(#state{pid=EventPid}=State) ->
 	    loop(State)
     end.
 
-tumble(#state{mod=Mod, size=Size, aggregate=Aggregate,count=Count,callback=CallbackFun}=State,Event) ->
-	NewAggregate = apply(Mod, accumulate, [Aggregate, Event]),
+tumble(#state{mod=Mod, seed=Seed, size=Size, aggregate=Aggregate,count=Count,callback=CallbackFun}=State,Event) ->
+	NewAggregate = Mod:accumulate(Aggregate, Event),
 	case Count >= Size of
-	false -> {noop,State#state{aggregate=NewAggregate,count=Count+1}};
+	false -> 
+        {noop,State#state{aggregate=NewAggregate,count=Count+1}};
 	true ->	
         CallbackFun(NewAggregate),
-        {emit,State#state{aggregate=apply(Mod, init, []),count=1}}
+        {emit,State#state{aggregate=Mod:init(Seed),count=1}}
 	end.
 

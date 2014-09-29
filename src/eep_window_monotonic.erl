@@ -34,6 +34,7 @@
 
 -export([start/3]).
 -export([new/4]).
+-export([new/5]).
 -export([tick/1]).
 -export([push/2]).
 
@@ -42,6 +43,7 @@
 -record(state, {
     interval :: integer(),
     mod :: module(),
+    seed = [] :: list(),
     clock_mod :: module(),
     clock,
     aggregate :: any(),
@@ -63,16 +65,21 @@ start(Mod, ClockMod, Interval) ->
     CallbackFun = fun(NewAggregate) ->
         gen_event:notify(
             EventPid,
-            {emit, apply(Mod, emit, [NewAggregate])}
+            {emit, Mod:emit(NewAggregate)}
         )
     end,
     {_, Clock} = ClockMod:tick(ClockMod:new(Interval)),
-   spawn(?MODULE, loop, [#state{mod=Mod, clock_mod=ClockMod, clock=Clock, pid=EventPid, aggregate=apply(Mod,init,[]), callback=CallbackFun}]).
+   spawn(?MODULE, loop, [#state{mod=Mod, clock_mod=ClockMod, clock=Clock, pid=EventPid, aggregate=Mod:init(), callback=CallbackFun}]).
 
 -spec new(Mod::module(), ClockMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(Mod, ClockMod, CallbackFun, Interval) ->
     {_, Clock} = ClockMod:tick(ClockMod:new(Interval)),
-    #state{mod=Mod, clock_mod=ClockMod, clock=Clock, aggregate=apply(Mod,init,[]), callback=CallbackFun}.
+    #state{mod=Mod, clock_mod=ClockMod, clock=Clock, aggregate=Mod:init(), callback=CallbackFun}.
+
+-spec new(Mod::module(), Seed::list(), ClockMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
+new(Mod, Seed, ClockMod, CallbackFun, Interval) ->
+    {_, Clock} = ClockMod:tick(ClockMod:new(Interval)),
+    #state{mod=Mod, seed=Seed, clock_mod=ClockMod, clock=Clock, aggregate=Mod:init(Seed), callback=CallbackFun}.
 
 -spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
 push(State, Event) ->
@@ -107,16 +114,16 @@ accum(#state{mod=Mod, clock_mod=ClockMod, clock=Clock, aggregate=Agg}=State,Even
         aggregate=Mod:accumulate(Agg, Event)
     }}.
 
-tick(#state{mod=Mod, aggregate=Agg, clock_mod=ClockMod, clock=Clock, callback=CallbackFun}=State) ->
-	{ Ticked, Tocked } =  apply(ClockMod,tick,[Clock]),
+tick(#state{mod=Mod, seed=Seed, aggregate=Agg, clock_mod=ClockMod, clock=Clock, callback=CallbackFun}=State) ->
+	{ Ticked, Tocked } =  ClockMod:tick(Clock),
 	case Ticked of
 		true ->
 		    case ClockMod:tock(Tocked, ClockMod:at(Tocked)) of
 			{true, Clock1} ->
                 CallbackFun(Agg),
-                {emit,State#state{aggregate=apply(Mod,init,[]),clock=ClockMod:inc(Clock1)}};
+                {emit,State#state{aggregate=Mod:init(Seed),clock=ClockMod:inc(Clock1)}};
 			{false, _Clock1} ->
-                {noop,State#state{aggregate=apply(Mod,init,[]),clock=Tocked}}
+                {noop,State#state{aggregate=Mod:init(Seed),clock=Tocked}}
 		    end;
 		false ->
 		    {noop,State}

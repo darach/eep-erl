@@ -32,6 +32,7 @@
 
 %% aggregate behaviour.
 -export([init/0]).
+-export([init/1]).
 -export([accumulate/2]).
 -export([compensate/2]).
 -export([emit/1]).
@@ -44,7 +45,12 @@
 }).
 
 init() ->
-  #eep_stats_vars{}.
+  init([#eep_stats_vars{}]).
+
+init([]) ->
+  init();
+init([#eep_stats_vars{}=State]) ->
+  State.
 
 accumulate(State,X) ->
    N = State#eep_stats_vars.n + 1,
