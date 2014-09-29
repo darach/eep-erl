@@ -7,7 +7,7 @@ all: test
 erl:
 	$(REBAR) get-deps compile
 
-test: all
+test: erl
 	@mkdir -p .eunit
 	$(REBAR) skip_deps=true eunit ct
 
