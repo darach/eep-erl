@@ -77,7 +77,7 @@ compensate(#state{acc_dict = AccDict} = State, X) ->
 %% Prepare the results for emit and return it. We just return the dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec emit(record()) -> dict().
+-spec emit(record()) -> dict:dict().
 
 emit(#state{acc_dict = AccDict}) ->
     AccDict.
