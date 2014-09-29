@@ -77,7 +77,8 @@ compensate(#state{acc_dict = AccDict} = State, X) ->
 %% Prepare the results for emit and return it. We just return the dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec emit(record()) -> any().
+%-spec emit(record()) -> any().
+% Sigh. http://erlang.org/pipermail/erlang-questions/2014-February/077968.html
 
 emit(#state{acc_dict = AccDict}) ->
     AccDict.
