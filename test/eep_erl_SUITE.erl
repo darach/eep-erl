@@ -176,16 +176,16 @@ t_win_sliding_inline(_Config) ->
     W0 = eep_window_sliding:new(eep_stats_count, fun(_) -> boop end, 2),
     {noop,W1} = eep_window_sliding:push(W0,foo),
     {emit,W2} = eep_window_sliding:push(W1,bar),
-    {state,2,eep_stats_count,2,_,3,_,[foo,bar]} = W2,
+    {state,2,eep_stats_count,[],2,_,3,_,[foo,bar]} = W2,
     {emit,W3} = eep_window_sliding:push(W2,baz),
-    {state,2,eep_stats_count,2,_,4,_,[bar,baz]} = W3,
+    {state,2,eep_stats_count,[],2,_,4,_,[bar,baz]} = W3,
     {emit,W4} = eep_window_sliding:push(W3,foo),
     {emit,W5} = eep_window_sliding:push(W4,bar),
     {emit,W6} = eep_window_sliding:push(W5,foo),
     {emit,W7} = eep_window_sliding:push(W6,bar),
     {emit,W8} = eep_window_sliding:push(W7,foo),
     {emit,W9} = eep_window_sliding:push(W8,bar),
-    {state,2,eep_stats_count,2,_,10,_,[foo,bar]} = W9.
+    {state,2,eep_stats_count,[],2,_,10,_,[foo,bar]} = W9.
 
 t_win_sliding_process(_Config) ->
     Pid = eep_window_sliding:start(eep_stats_count, 2),
@@ -193,12 +193,12 @@ t_win_sliding_process(_Config) ->
     Pid ! {push, bar},
     Pid ! {debug, self()},
     receive
-        { debug, Debug0 } -> {state,2,eep_stats_count,2,_,3,_,[foo,bar]} = Debug0
+        { debug, Debug0 } -> {state,2,eep_stats_count,[],2,_,3,_,[foo,bar]} = Debug0
     end,
     Pid ! {push, baz},
     Pid ! {debug, self()},
     receive
-        { debug, Debug1 } -> {state,2,eep_stats_count,2,_,4,_,[bar,baz]} = Debug1
+        { debug, Debug1 } -> {state,2,eep_stats_count,[],2,_,4,_,[bar,baz]} = Debug1
     end,
     Pid ! {push, foo},
     Pid ! {push, bar},
@@ -208,11 +208,11 @@ t_win_sliding_process(_Config) ->
     Pid ! {push, bar},
     Pid ! {debug, self()},
     receive
-        { debug, Debug2 } -> {state,2,eep_stats_count,2,_,10,_,[foo,bar]} = Debug2
+        { debug, Debug2 } -> {state,2,eep_stats_count,[],2,_,10,_,[foo,bar]} = Debug2
     end,
     Pid ! {debug, self()},
     receive
-        { debug, Debug3 } -> {state,2,eep_stats_count,2,_,10,_,[foo,bar]} = Debug3
+        { debug, Debug3 } -> {state,2,eep_stats_count,[],2,_,10,_,[foo,bar]} = Debug3
     end,
     Pid ! stop.
 

@@ -30,6 +30,7 @@
 
 -export([start/2]).
 -export([new/3]).
+-export([new/4]).
 -export([push/2]).
 
 %% private.
@@ -38,6 +39,7 @@
 -record(state, {
     size :: integer(),
     mod :: module(),
+    seed = [] :: list(),
     aggregate :: any(),
     callback = undefined :: fun((...) -> any()),
     count = 1 :: integer(),
@@ -50,14 +52,19 @@ start(Mod, Size) ->
   CallbackFun = fun(NewAggregate) -> 
       gen_event:notify(
           EventPid,
-          {emit, apply(Mod, emit, [NewAggregate])}
+          {emit, Mod:emit(NewAggregate)}
       )
   end,
-  spawn(?MODULE, loop, [#state{mod=Mod, size=Size, pid=EventPid, count=1, aggregate=apply(Mod,init,[]), callback=CallbackFun}]).
+  spawn(?MODULE, loop, [#state{mod=Mod, seed=[], size=Size, pid=EventPid, count=1, aggregate=Mod:init(), callback=CallbackFun}]).
 
 -spec new(Mod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
 new(Mod, CallbackFun, Size) ->
-    #state{size=Size, mod=Mod, callback=CallbackFun, aggregate=apply(Mod, init, [])}.
+    #state{size=Size, mod=Mod, callback=CallbackFun, aggregate=Mod:init()}.
+
+-spec new(Mod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
+new(Mod, Seed, CallbackFun, Size) ->
+    #state{size=Size, seed=Seed, mod=Mod, callback=CallbackFun, aggregate=Mod:init(Seed)}.
+
 
 push(State, Event) ->
     slide(State, Event).
@@ -82,7 +89,7 @@ loop(#state{pid=EventPid}=State) ->
   end.
 
 slide(#state{mod=Mod, size=Size, aggregate=Aggregate,count=Count,callback=CallbackFun,prior=Prior}=State,Event) ->
-    NewAggregate = apply(Mod, accumulate, [Aggregate, Event]),
+    NewAggregate = Mod:accumulate(Aggregate, Event),
     if 
         Count < Size ->
             NewPrior = Prior ++ [Event],
@@ -94,7 +101,7 @@ slide(#state{mod=Mod, size=Size, aggregate=Aggregate,count=Count,callback=Callba
         true ->
             Value = lists:nth(1,Prior),
             CallbackFun(NewAggregate), 
-            NewAggregate2 = apply(Mod, compensate, [NewAggregate, Value]),
+            NewAggregate2 = Mod:compensate(NewAggregate, Value),
             ct:log("Prior: ~p Event: ~p", [Prior, Event]),
             %NewPrior = lists:tl(Prior ++ [Event]),
             %NewPrior = lists:sublist(Prior,2,Size-1) ++ [Event],
