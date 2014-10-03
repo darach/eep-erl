@@ -57,17 +57,17 @@ start(Mod, Interval) ->
     end,
 
   {_, Clock} = eep_clock_wall:tick(eep_clock_wall:new(Interval)),
-  spawn(?MODULE, loop, [#state{mod=Mod, clock=Clock, pid=EventPid, aggregate=Mod:init(), callback=CallbackFun, epoch=eep_clock_wall:ts()}]).
+  spawn(?MODULE, loop, [#state{mod=Mod, clock=Clock, pid=EventPid, aggregate=Mod:init(), callback=CallbackFun, epoch=eep_clock_wall:ts(), interval=Interval}]).
 
 -spec new(Mod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(Mod, CallbackFun, Interval) ->
     {_, Clock} = eep_clock_wall:tick(eep_clock_wall:new(Interval)),
-    #state{mod=Mod, clock=Clock, aggregate=Mod:init(), callback=CallbackFun, epoch=eep_clock_wall:ts()}.
+    #state{mod=Mod, clock=Clock, aggregate=Mod:init(), callback=CallbackFun, epoch=eep_clock_wall:ts(),interval=Interval}.
 
 -spec new(Mod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(Mod, Seed, CallbackFun, Interval) ->
     {_, Clock} = eep_clock_wall:tick(eep_clock_wall:new(Interval)),
-    #state{mod=Mod, seed=Seed, clock=Clock, aggregate=Mod:init(Seed), callback=CallbackFun, epoch=eep_clock_wall:ts()}.
+    #state{mod=Mod, seed=Seed, clock=Clock, aggregate=Mod:init(Seed), callback=CallbackFun, epoch=eep_clock_wall:ts(),interval=Interval}.
 
 -spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
 push(State, Event) ->
@@ -102,14 +102,14 @@ accum(#state{mod=Mod, clock=Clock, aggregate=Agg}=State,Event) ->
         aggregate=Mod:accumulate(Agg, Event)
     }}.
 
-tick(#state{mod=Mod, seed=Seed, aggregate=Agg,clock=Clock,callback=CallbackFun,epoch=Epoch}=State) ->
+tick(#state{mod=Mod, seed=Seed, aggregate=Agg,clock=Clock,callback=CallbackFun,epoch=Epoch, interval=Interval}=State) ->
     { Ticked, Tocked } =  eep_clock_wall:tick(Clock),
     case Ticked of
         true ->
             case eep_clock_wall:tock(Tocked,Epoch) of
                 {true, Clock1} ->
                     CallbackFun(Agg),
-                    {emit,State#state{aggregate=Mod:init(Seed),clock=eep_clock_wall:inc(Clock1), epoch=eep_clock_wall:ts()}};
+                    {emit,State#state{aggregate=Mod:init(Seed),clock=Clock1, epoch=(Epoch+Interval)}};
                 {false, _Clock1} ->
                     {noop,State#state{aggregate=Mod:init(Seed),clock=Tocked, epoch=Epoch}}
             end;
