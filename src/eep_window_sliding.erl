@@ -79,7 +79,7 @@ loop(#state{pid=EventPid}=State) ->
         gen_event:add_handler(EventPid, Handler, Arr),
         loop(State);
     { delete_handler, Handler } ->
-        gen_event:delete_handler(EventPid, Handler),
+        gen_event:delete_handler(EventPid, Handler, []),
         loop(State);
     stop ->
       ok;

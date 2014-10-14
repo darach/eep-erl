@@ -58,7 +58,7 @@
 %% @end
 %%--------------------------------------------------------------------
 
--spec start(Mod::module(), ClockMod::integer(), Interval::integer()) -> pid().
+-spec start(Mod::module(), ClockMod::module(), Interval::integer()) -> pid().
 
 start(Mod, ClockMod, Interval) ->
     {ok, EventPid } = gen_event:start_link(),
@@ -98,7 +98,7 @@ loop(#state{pid=EventPid}=State) ->
       gen_event:add_handler(EventPid, Handler, Arr),
       loop(State);
     { delete_handler, Handler } ->
-      gen_event:delete_handler(EventPid, Handler),
+      gen_event:delete_handler(EventPid, Handler, []),
       loop(State);
     stop ->
       ok;

@@ -48,7 +48,7 @@
 %% Initialize the dict counter with a new, fresh, dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec init() -> record().
+-spec init() -> #state{}.
 
 init() ->
     init([#state{acc_dict = dict:new()}]).
@@ -58,7 +58,7 @@ init() ->
 %% Initialize the dict counter with an existing dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec init([#state{}]) -> record().
+-spec init([#state{}]) -> #state{}.
 
 init([]) ->
   init();
@@ -70,7 +70,7 @@ init([#state{}=Seed]) ->
 %% Accumulate an event with key X
 %% @end
 %%--------------------------------------------------------------------
--spec accumulate(State :: record(), X :: any()) -> record().
+-spec accumulate(State :: #state{}, X :: any()) -> #state{}.
 
 accumulate(#state{acc_dict = AccDict} = State, X) ->
     State#state{acc_dict = dict:update_counter(X, 1, AccDict)}.
@@ -80,7 +80,7 @@ accumulate(#state{acc_dict = AccDict} = State, X) ->
 %% Compensate for an event with key X
 %% @end
 %%--------------------------------------------------------------------
--spec compensate(State :: record(), X :: any()) -> record().
+-spec compensate(State :: #state{}, X :: any()) -> #state{}.
 
 compensate(#state{acc_dict = AccDict} = State, X) ->
     State#state{acc_dict = dict:update_counter(X, -1, AccDict)}.
@@ -90,7 +90,7 @@ compensate(#state{acc_dict = AccDict} = State, X) ->
 %% Prepare the results for emit and return it. We just return the dictionary.
 %% @end
 %%--------------------------------------------------------------------
-%-spec emit(record()) -> any().
+-spec emit(#state{}) -> any().
 % Sigh. http://erlang.org/pipermail/erlang-questions/2014-February/077968.html
 
 emit(#state{acc_dict = AccDict}) ->
