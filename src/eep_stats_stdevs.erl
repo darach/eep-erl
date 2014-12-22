@@ -1,5 +1,5 @@
 %% -------------------------------------------------------------------
-%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com > 
+%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com >
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy of this software and associated documentation files (the
@@ -68,6 +68,8 @@ compensate(State,X) ->
    M2 = D*(X - M) + State#eep_stats_stdevs.m2,
    State#eep_stats_stdevs{m2 = M2, m = M, d = D, n = N}.
 
+emit(State) when State#eep_stats_stdevs.n =< 1 ->
+  0;
 emit(State) ->
   math:sqrt(State#eep_stats_stdevs.m2 / (State#eep_stats_stdevs.n - 1)).
 
@@ -75,9 +77,11 @@ emit(State) ->
 
 basic_test() ->
   S0 = init(),
+  ?assertEqual(0, emit(S0)),
   V0 = S0#eep_stats_stdevs.m,
   ?assertEqual(0, V0),
   S1 = accumulate(S0, 1),
+  ?assertEqual(0, emit(S1)),
   ?assertEqual(1.0, S1#eep_stats_stdevs.m),
   S2 = accumulate(S1, 8),
   ?assertEqual(4.5, S2#eep_stats_stdevs.m),
