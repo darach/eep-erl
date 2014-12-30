@@ -100,8 +100,8 @@ slide(#state{mod=Mod, size=Size, aggregate=Aggregate,count=Count,callback=Callba
             {emit,State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
         true ->
             Value = lists:nth(1,Prior),
-            CallbackFun(NewAggregate), 
             NewAggregate2 = Mod:compensate(NewAggregate, Value),
+            CallbackFun(NewAggregate2), 
             NewPrior = erlang:tl(Prior) ++ [Event],
             {emit,State#state{aggregate=NewAggregate2,count=Count+1,prior=NewPrior}}
     end.
