@@ -109,20 +109,18 @@ t_clock_wall(_Config) ->
 t_clock_count(_Config) ->
   count = eep_clock_count:name(),
   C0 = eep_clock_count:new(2),
-  0 = eep_clock_count:at(C0),
-  T0 = 0,
-  case (T0 - C0#eep_clock.at) =:= 0 of true -> ok end,
+  0  = eep_clock_count:at(C0),
   C1 = eep_clock_count:inc(C0),
-  1 = eep_clock_count:at(C1),
-  case (C1#eep_clock.at - T0) =:= 1 of true -> ok end,
-  {false,C2} = eep_clock_count:tick(C1),
-  {false,C2} = eep_clock_count:tick(C2),
-  {false,C2} = eep_clock_count:tock(C2,notused),
-  C3 = eep_clock_count:inc(C2),
-  {false,C2} = eep_clock_count:tock(C2,notused),
-  {true,C4} = eep_clock_count:tock(C3,notused),
-  2 = eep_clock_count:at(C4),
-  3 = C4#eep_clock.mark.
+  1  = eep_clock_count:at(C1),
+  {_false,C2} = eep_clock_count:tick(C1),
+  {_true,C3}  = eep_clock_count:tick(C2),
+  {_true,C4}  = eep_clock_count:tock(C3,notused),
+
+  C5 = eep_clock_count:inc(C4),
+  {true, C6} = eep_clock_count:tock(C5,notused),
+  {true,C7} = eep_clock_count:tock(C6,notused),
+  4 = eep_clock_count:at(C7),
+  7 = C7#eep_clock.mark.
 
 t_win_tumbling_inline(_Config) ->
     W0  = eep_window_tumbling:new(eep_stats_count, fun(_Callback) -> boop end, 2),
@@ -267,7 +265,7 @@ t_win_monotonic_inline(_Config) ->
     W0 = eep_window_monotonic:new(eep_stats_count, eep_clock_count, fun(_) -> boop end, 0),
     {noop,W1} = eep_window_monotonic:push(W0,foo),
     {noop,W2} = eep_window_monotonic:push(W1,bar),
-    {state,undefined,eep_stats_count,[],eep_clock_count,{eep_clock,2,0,0},2,_,undefined} = W2,
+    {state,undefined,eep_stats_count,[],eep_clock_count,{eep_clock,3,0,0},2,_,undefined} = W2,
     {emit,W3} = eep_window_monotonic:tick(W2),
     {state,undefined,eep_stats_count,[],eep_clock_count,{eep_clock,_,_,0},0,_,undefined} = W3,
     {noop,W4} = eep_window_monotonic:push(W3,foo),
@@ -286,12 +284,12 @@ t_win_monotonic_process(_config) ->
     Pid ! {push, bar},
     Pid ! {debug, self()},
     receive
-    { debug, Debug0 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,2,0,0},2,_,_}  = Debug0
+    { debug, Debug0 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,3,0,0},2,_,_}  = Debug0
     end,
     Pid ! tick,
     Pid ! {debug, self()},
     receive
-    { debug, Debug1 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,3,0,0},0,_,_}  = Debug1
+    { debug, Debug1 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,4,0,0},0,_,_}  = Debug1
     end,
     Pid ! {push, foo},
     Pid ! {push, bar},
@@ -301,12 +299,12 @@ t_win_monotonic_process(_config) ->
     Pid ! {push, bar},
     Pid ! {debug, self()},
     receive
-    { debug, Debug2 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,9,0,0},6,_,_}  = Debug2
+    { debug, Debug2 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,10,0,0},6,_,_}  = Debug2
     end,
     Pid ! tick,
     Pid ! {debug, self()},
     receive
-    { debug, Debug3 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,10,0,0},0,_,_}  = Debug3
+    { debug, Debug3 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,11,0,0},0,_,_}  = Debug3
     end,
     Pid ! stop.
 
