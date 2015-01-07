@@ -124,5 +124,5 @@ tick(#state{callback=CallbackFun, agg_mod=AggMod, aggregate=Agg,
                     {noop,State#state{aggregate=AggMod:init(Seed),clock=Tocked, epoch=Epoch}}
             end;
         false ->
-            {noop,State}
+            {noop,State#state{clock=Tocked}}
     end.
