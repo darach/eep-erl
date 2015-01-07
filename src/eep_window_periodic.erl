@@ -60,8 +60,7 @@ start(AggMod, Interval) ->
 
 -spec new(AggMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(AggMod, CallbackFun, Interval) ->
-    {_, Clock} = eep_clock_wall:tick(eep_clock_wall:new(Interval)),
-    #state{agg_mod=AggMod, clock=Clock, aggregate=AggMod:init(), callback=CallbackFun, epoch=eep_clock_wall:ts(),interval=Interval}.
+    new(AggMod, [], CallbackFun, Interval).
 
 -spec new(AggMod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(AggMod, Seed, CallbackFun, Interval) ->
