@@ -32,6 +32,9 @@
   interval = 1 :: integer()
 }).
 
+-type ck_state() :: #eep_clock{}.
+-export_type([ck_state/0]).
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
