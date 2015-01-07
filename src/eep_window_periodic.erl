@@ -56,8 +56,8 @@ start(Mod, Interval) ->
         )
     end,
 
-  {_, Clock} = eep_clock_wall:tick(eep_clock_wall:new(Interval)),
-  spawn(?MODULE, loop, [#state{mod=Mod, clock=Clock, pid=EventPid, aggregate=Mod:init(), callback=CallbackFun, epoch=eep_clock_wall:ts(), interval=Interval}]).
+    State = new(Mod, CallbackFun, Interval),
+    spawn(?MODULE, loop, [State]).
 
 -spec new(Mod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(Mod, CallbackFun, Interval) ->
@@ -116,4 +116,3 @@ tick(#state{mod=Mod, seed=Seed, aggregate=Agg,clock=Clock,callback=CallbackFun,e
         false ->
             {noop,State}
     end.
-    
