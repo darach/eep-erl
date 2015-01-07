@@ -220,9 +220,9 @@ t_win_periodic_inline(_Config) ->
     W0 = eep_window_periodic:new(eep_stats_count, fun(_) -> boop end, 0),
     {noop,W1} = eep_window_periodic:push(W0,foo),
     {noop,W2} = eep_window_periodic:push(W1,bar),
-    {state,0,eep_stats_count,[],{eep_clock,_,_,0},2,_,undefined,_} = W2,
+    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},2,_,undefined,_} = W2,
     {emit,W3} = eep_window_periodic:tick(W2),
-    {state,0,eep_stats_count,[],{eep_clock,_,_,0},0,_,undefined,_} = W3,
+    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_,undefined,_} = W3,
     {noop,W4} = eep_window_periodic:push(W3,foo),
     {noop,W5} = eep_window_periodic:push(W4,bar),
     {noop,W6} = eep_window_periodic:push(W5,foo),
@@ -230,7 +230,7 @@ t_win_periodic_inline(_Config) ->
     {noop,W8} = eep_window_periodic:push(W7,foo),
     {noop,W9} = eep_window_periodic:push(W8,bar),
     {emit,W10} = eep_window_periodic:tick(W9),
-    {state,0,eep_stats_count,[],{eep_clock,_,_,0},0,_,undefined,_} = W10,
+    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_,undefined,_} = W10,
     ok.
 
 t_win_periodic_process(_Config) ->
@@ -239,12 +239,12 @@ t_win_periodic_process(_Config) ->
   Pid ! {push, bar},
   Pid ! {debug, self()},
   receive
-    { debug, Debug0 } -> {state,0,eep_stats_count,[],{eep_clock,_,_,0},2,_,_,_} = Debug0
+    { debug, Debug0 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},2,_,_,_} = Debug0
   end,
   Pid ! tick,
   Pid ! {debug, self()},
   receive
-    { debug, Debug1 } -> {state,0,eep_stats_count,[],{eep_clock,_,_,0},0,_,_,_} = Debug1
+    { debug, Debug1 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_,_,_} = Debug1
   end,
   Pid ! {push, foo},
   Pid ! {push, bar},
@@ -254,12 +254,12 @@ t_win_periodic_process(_Config) ->
   Pid ! {push, bar},
   Pid ! {debug, self()},
   receive
-    { debug, Debug2 } -> {state,0,eep_stats_count,[],{eep_clock,_,_,0},6,_,_,_} = Debug2
+    { debug, Debug2 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},6,_,_,_} = Debug2
   end,
   Pid ! tick,
   Pid ! {debug, self()},
   receive
-    { debug, Debug3 } -> {state,0,eep_stats_count,[],{eep_clock,_,_,0},0,_,_,_} = Debug3
+    { debug, Debug3 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_,_,_} = Debug3
   end,
   Pid ! stop.
 
