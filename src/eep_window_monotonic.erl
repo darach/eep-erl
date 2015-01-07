@@ -121,7 +121,7 @@ tick(#state{mod=Mod, seed=Seed, aggregate=Agg, clock_mod=ClockMod, clock=Clock, 
 		    case ClockMod:tock(Tocked, ClockMod:at(Tocked)) of
 			{true, Clock1} ->
                 CallbackFun(Agg),
-                {emit,State#state{aggregate=Mod:init(Seed),clock=ClockMod:inc(Clock1)}};
+                {emit,State#state{aggregate=Mod:init(Seed),clock=Clock1}};
 			{false, _Clock1} ->
                 {noop,State#state{aggregate=Mod:init(Seed),clock=Tocked}}
 		    end;
