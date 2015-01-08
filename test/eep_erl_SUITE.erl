@@ -42,6 +42,9 @@
 -export([t_win_monotonic_inline/1]).
 -export([t_win_monotonic_process/1]).
 -export([t_seedable_aggregate/1]).
+-export([t_avg_aggregate_accum/1]).
+-export([t_monotonic_clock_count/1]).
+-export([t_periodic_window/1]).
 
 -include("eep_erl.hrl").
 -include_lib("common_test/include/ct.hrl").
@@ -53,7 +56,8 @@ all() ->
         {group, win_sliding},
         {group, win_periodic},
         {group, win_monotonic},
-        {group, aggregate}
+        {group, aggregate},
+        {group, props}
     ].
 
 suite() ->
@@ -83,6 +87,11 @@ groups() ->
             ]},
         {aggregate, [], [
             t_seedable_aggregate
+            ]},
+        {props, [], [
+            t_avg_aggregate_accum,
+            t_monotonic_clock_count,
+            t_periodic_window
             ]}
     ].
 
@@ -316,3 +325,11 @@ t_seedable_aggregate(_Config) ->
     [meep,moop] = seedable_aggregate:emit([meep,moop]),
     ok.
 
+t_avg_aggregate_accum(_) ->
+    true = proper:quickcheck(prop_eep:prop_avg_aggregate_accum()).
+
+t_monotonic_clock_count(_) ->
+    true = proper:quickcheck(prop_eep:prop_monotonic_clock_count()).
+
+t_periodic_window(_) ->
+    true = proper:quickcheck(prop_eep:prop_monotonic_clock_count()).

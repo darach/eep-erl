@@ -1,10 +1,10 @@
 -module(prop_eep).
 
--compile([export_all]).
-
 -include_lib("proper/include/proper.hrl").
 
 -export([prop_avg_aggregate_accum/0]).
+-export([prop_monotonic_clock_count/0]).
+-export([prop_periodic_window/0]).
 
 -define(epsilon, 1.0e-14).
 
