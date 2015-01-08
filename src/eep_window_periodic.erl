@@ -72,7 +72,7 @@ new(AggMod, ClockMod, CallbackFun, Interval) ->
 
 -spec new(AggMod::module(), ClockMod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(AggMod, ClockMod, Seed, CallbackFun, Interval) ->
-    {_, Clock} = ClockMod:tick(ClockMod:new(Interval)),
+    Clock = ClockMod:new(Interval),
     #state{agg_mod=AggMod, aggregate=AggMod:init(Seed),
            clock_mod=ClockMod, clock=Clock, epoch=ClockMod:at(Clock), seed=Seed, interval=Interval,
            callback=CallbackFun}.
@@ -103,12 +103,8 @@ loop(#state{pid=EventPid}=State) ->
       loop(State)
   end.
 
-accum(#state{agg_mod=AggMod, aggregate=Agg,
-             clock_mod=CkMod, clock=Clock}=State,Event) ->
-    {noop, State#state{
-        clock=CkMod:inc(Clock),
-        aggregate=AggMod:accumulate(Agg, Event)
-    }}.
+accum(#state{agg_mod=AggMod, aggregate=Agg}=State,Event) ->
+    {noop, State#state{ aggregate=AggMod:accumulate(Agg, Event) }}.
 
 tick(#state{callback=CallbackFun, agg_mod=AggMod, aggregate=Agg,
             clock_mod=CkMod, clock=Clock,
