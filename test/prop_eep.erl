@@ -1,3 +1,29 @@
+%% -------------------------------------------------------------------
+%% Permission is hereby granted, free of charge, to any person obtaining a
+%% copy of this software and associated documentation files (the
+%% "Software"), to deal in the Software without restriction, including
+%% without limitation the rights to use, copy, modify, merge, publish,
+%% distribute, sublicense, and/or sell copies of the Software, and to permit
+%% persons to whom the Software is furnished to do so, subject to the
+%% following conditions:
+%%
+%% The above copyright notice and this permission notice shall be included
+%% in all copies or substantial portions of the Software.
+%%
+%% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+%% OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+%% MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+%% NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+%% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+%% OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+%% USE OR OTHER DEALINGS IN THE SOFTWARE.
+%% -------------------------------------------------------------------
+%%  @author Michael Coles <michael.coles@gmail.com>
+%%  @copyright (C) 2014, Darach Ennis, Michael Coles
+%%  @doc
+%%
+%%  @end
+%% -------------------------------------------------------------------
 -module(prop_eep).
 
 -include_lib("proper/include/proper.hrl").
@@ -11,7 +37,7 @@
 prop_avg_aggregate_accum() ->
     ?FORALL(Ints, non_empty(list(integer())),
             begin
-                {RealSum, RealCount, AggData} = 
+                {RealSum, RealCount, AggData} =
                     lists:foldl(
                       fun(N, {Sum, Count, State}) ->
                               {Sum+N, Count+1, eep_stats_avg:accumulate(State, N)}
@@ -24,7 +50,7 @@ prop_avg_aggregate_accum() ->
 prop_monotonic_clock_count() ->
     ?FORALL({Interval, Events},
             {pos_integer(), list(tick)},
-            begin 
+            begin
                Init = eep_clock_count:new(Interval),
                {Clock, Tocks} = lists:foldl(fun clock_handle/2,
                                             {Init, 0}, Events),
