@@ -41,20 +41,16 @@
 name() -> count.
 
 at(State) -> 
- State#eep_clock.at.
+ State#eep_clock.mark.
 
 new(Interval) ->
-  #eep_clock{at = 0, interval = Interval}.
+  #eep_clock{at = 0, mark = 0, interval = Interval}.
 
 inc(State) -> 
   State#eep_clock{at = State#eep_clock.at + 1}.
 
 tick(State) ->
-  MarkedState = case State#eep_clock.mark of
-    undefined -> State#eep_clock{mark = State#eep_clock.at};
-    _Other -> State
-  end,
-  NewState = inc(MarkedState),
+  NewState = inc(State),
   {(NewState#eep_clock.at - NewState#eep_clock.mark) >= NewState#eep_clock.interval, NewState}.
 
 tock(State, _Elapsed) ->
