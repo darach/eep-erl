@@ -50,7 +50,7 @@
 -include_lib("common_test/include/ct.hrl").
 
 -define(proptest(TC), proper:quickcheck(TC)
-                        orelse ct:fail({proper:counterexample(TC)})).
+                        orelse ct:fail({counterexample, proper:counterexample(TC)})).
 
 all() ->
     [
