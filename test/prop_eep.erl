@@ -54,7 +54,8 @@ prop_monotonic_clock_count() ->
                Init = eep_clock_count:new(Interval),
                {Clock, Tocks} = lists:foldl(fun clock_handle/2,
                                             {Init, 0}, Events),
-               length(Events) == eep_clock_count:at(Clock)
+               ExpectedTime = length(Events) - (length(Events) rem Interval),
+               eep_clock_count:at(Clock) == ExpectedTime
                     andalso Tocks == length(Events) div Interval
            end).
 

@@ -59,8 +59,8 @@ tick(State) ->
   NewState = inc(State),
   {(NewState#eep_clock.at - NewState#eep_clock.mark) >= 0, NewState}.
 
-tock(State, Elapsed) ->
-  Delta = State#eep_clock.at - Elapsed,
+tock(State, _Since) ->
+  Delta = State#eep_clock.at - State#eep_clock.mark,
   case Delta >= State#eep_clock.interval of
     true -> {true, State#eep_clock{mark = State#eep_clock.mark + State#eep_clock.interval}};
     false -> {false, State}
