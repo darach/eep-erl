@@ -64,7 +64,7 @@ clock_handle(tick, {Clock, Tocks}) ->
         {false, TickedClock} ->
             {TickedClock, Tocks};
         {true, TockingClock} ->
-            case eep_clock_count:tock(TockingClock, undefined) of
+            case eep_clock_count:tock(TockingClock) of
                 {true, Tocked} -> {Tocked, Tocks+1};
                 {false, Tocked} -> {Tocked, Tocks}
             end

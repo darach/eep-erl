@@ -38,5 +38,5 @@
     New :: ck_state().
 -callback tick(Old :: ck_state()) ->
     {Tocked :: boolean(), New :: ck_state()}.
--callback tock(Old :: ck_state(), Elapsed :: integer()) ->
+-callback tock(Old :: ck_state()) ->
     {Tocked :: boolean(), New :: ck_state()}.

@@ -46,8 +46,7 @@
     clock,
     aggregate :: any(),
     callback = undefined :: fun((...) -> any()),
-    pid :: pid(),
-    epoch :: integer()
+    pid :: pid()
 }).
 
 start(AggMod, Interval) ->
@@ -73,8 +72,8 @@ new(AggMod, ClockMod, CallbackFun, Interval) ->
 -spec new(AggMod::module(), ClockMod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(AggMod, ClockMod, Seed, CallbackFun, Interval) ->
     Clock = ClockMod:new(Interval),
-    #state{agg_mod=AggMod, aggregate=AggMod:init(Seed),
-           clock_mod=ClockMod, clock=Clock, epoch=ClockMod:at(Clock), seed=Seed, interval=Interval,
+    #state{agg_mod=AggMod, aggregate=AggMod:init(Seed), seed=Seed,
+           clock_mod=ClockMod, clock=Clock, interval=Interval,
            callback=CallbackFun}.
 
 -spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
@@ -106,18 +105,17 @@ loop(#state{pid=EventPid}=State) ->
 accum(#state{agg_mod=AggMod, aggregate=Agg}=State,Event) ->
     {noop, State#state{ aggregate=AggMod:accumulate(Agg, Event) }}.
 
-tick(#state{callback=CallbackFun, agg_mod=AggMod, aggregate=Agg,
-            clock_mod=CkMod, clock=Clock,
-            seed=Seed, epoch=Epoch, interval=Interval}=State) ->
+tick(#state{callback=CallbackFun, agg_mod=AggMod, aggregate=Agg, seed=Seed,
+            clock_mod=CkMod, clock=Clock}=State) ->
     { Ticked, Tocked } =  CkMod:tick(Clock),
     case Ticked of
         true ->
-            case CkMod:tock(Tocked,Epoch) of
+            case CkMod:tock(Tocked) of
                 {true, Clock1} ->
                     CallbackFun(Agg),
-                    {emit,State#state{aggregate=AggMod:init(Seed),clock=Clock1, epoch=(Epoch+Interval)}};
+                    {emit,State#state{aggregate=AggMod:init(Seed),clock=Clock1}};
                 {false, _Clock1} ->
-                    {noop,State#state{aggregate=AggMod:init(Seed),clock=Tocked, epoch=Epoch}}
+                    {noop,State#state{aggregate=AggMod:init(Seed),clock=Tocked}}
             end;
         false ->
             {noop,State#state{clock=Tocked}}

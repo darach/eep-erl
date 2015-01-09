@@ -37,7 +37,7 @@
 -export([new/1]).
 -export([inc/1]).
 -export([tick/1]).
--export([tock/2]).
+-export([tock/1]).
 
 %% impl
 -export([ts/0]).
@@ -59,7 +59,7 @@ tick(State) ->
   NewState = inc(State),
   {(NewState#eep_clock.at - NewState#eep_clock.mark) >= 0, NewState}.
 
-tock(State, _Since) ->
+tock(State) ->
   Delta = State#eep_clock.at - State#eep_clock.mark,
   case Delta >= State#eep_clock.interval of
     true -> {true, State#eep_clock{mark = State#eep_clock.mark + State#eep_clock.interval}};

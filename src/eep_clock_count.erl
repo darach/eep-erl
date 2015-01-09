@@ -36,7 +36,7 @@
 -export([new/1]).
 -export([inc/1]).
 -export([tick/1]).
--export([tock/2]).
+-export([tock/1]).
 
 name() -> count.
 
@@ -53,7 +53,7 @@ tick(State) ->
   NewState = inc(State),
   {(NewState#eep_clock.at - NewState#eep_clock.mark) >= NewState#eep_clock.interval, NewState}.
 
-tock(State, _Elapsed) ->
+tock(State) ->
     #eep_clock{mark=Mark, interval=Interval} = State,
     Delta = State#eep_clock.at,
     case Delta >= State#eep_clock.interval of

@@ -111,7 +111,7 @@ t_clock_wall(_Config) ->
     true = (C1#eep_clock.at - T0) >= 1,
     T1 = C1#eep_clock.at,
     {true,C2} = eep_clock_wall:tick(C1),
-    {true,C3} = eep_clock_wall:tock(C2,unused),
+    {true,C3} = eep_clock_wall:tock(C2),
     true = C3#eep_clock.mark =< T1.
 
 t_clock_count(_Config) ->
@@ -121,11 +121,11 @@ t_clock_count(_Config) ->
   {false, C1} = eep_clock_count:tick(C0),
   0  = eep_clock_count:at(C1),
   {true,C2} = eep_clock_count:tick(C1),
-  {true,C3}  = eep_clock_count:tock(C2,notused),
+  {true,C3}  = eep_clock_count:tock(C2),
   {false,C4}  = eep_clock_count:tick(C3),
 
-  {true, C5} = eep_clock_count:tock(C4,notused),
-  {true,C6} = eep_clock_count:tock(C5,notused),
+  {true, C5} = eep_clock_count:tock(C4),
+  {true,C6} = eep_clock_count:tock(C5),
   6 = eep_clock_count:at(C6),
   6 = C6#eep_clock.mark.
 
