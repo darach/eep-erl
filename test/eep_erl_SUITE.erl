@@ -49,6 +49,9 @@
 -include("eep_erl.hrl").
 -include_lib("common_test/include/ct.hrl").
 
+-define(proptest(TC), proper:quickcheck(TC)
+                        orelse ct:fail({proper:counterexample(TC)})).
+
 all() ->
     [
         {group, clock},
@@ -324,10 +327,10 @@ t_seedable_aggregate(_Config) ->
     ok.
 
 t_avg_aggregate_accum(_) ->
-    true = proper:quickcheck(prop_eep:prop_avg_aggregate_accum()).
+    ?proptest(prop_eep:prop_avg_aggregate_accum()).
 
 t_monotonic_clock_count(_) ->
-    true = proper:quickcheck(prop_eep:prop_monotonic_clock_count()).
+    ?proptest(prop_eep:prop_monotonic_clock_count()).
 
 t_periodic_window(_) ->
-    true = proper:quickcheck(prop_eep:prop_monotonic_clock_count()).
+    ?proptest(prop_eep:prop_monotonic_clock_count()).
