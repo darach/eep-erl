@@ -36,29 +36,27 @@
 -export([new/1]).
 -export([inc/1]).
 -export([tick/1]).
--export([tock/2]).
+-export([tock/1]).
 
 name() -> count.
 
 at(State) -> 
- State#eep_clock.at.
+ State#eep_clock.mark.
 
 new(Interval) ->
-  #eep_clock{at = 0, interval = Interval}.
+  #eep_clock{at = 0, mark = 0, interval = Interval}.
 
 inc(State) -> 
   State#eep_clock{at = State#eep_clock.at + 1}.
 
 tick(State) ->
-  NewState = case State#eep_clock.mark of
-    undefined -> State#eep_clock{mark = State#eep_clock.at};
-    _Other -> State
-  end,
+  NewState = inc(State),
   {(NewState#eep_clock.at - NewState#eep_clock.mark) >= NewState#eep_clock.interval, NewState}.
 
-tock(State, _Elapsed) ->
-  Delta = State#eep_clock.at,
-  case Delta >= State#eep_clock.interval of
-    true -> {true, State#eep_clock{mark = State#eep_clock.mark + State#eep_clock.interval}};
-    false -> {false, State}
-  end.
+tock(State) ->
+    #eep_clock{mark=Mark, interval=Interval} = State,
+    Delta = State#eep_clock.at,
+    case Delta >= State#eep_clock.interval of
+        true -> {true, State#eep_clock{mark = (Mark + Interval)}};
+        false -> {false, State}
+    end.

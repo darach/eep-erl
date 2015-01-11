@@ -29,8 +29,10 @@
 -include_lib("eep_erl.hrl").
 
 -export([start/2]).
+-export([start/3]).
 -export([new/3]).
 -export([new/4]).
+-export([new/5]).
 -export([tick/1]).
 -export([push/2]).
 
@@ -38,36 +40,41 @@
 
 -record(state, {
     interval :: integer(),
-    mod :: module(),
+    agg_mod :: module(),
+    clock_mod :: module(),
     seed = [] :: list(),
     clock,
     aggregate :: any(),
     callback = undefined :: fun((...) -> any()),
-    pid :: pid(),
-    epoch :: integer()
+    pid :: pid()
 }).
 
-start(Mod, Interval) ->
+start(AggMod, Interval) ->
+    start(AggMod, eep_clock_wall, Interval).
+start(AggMod, ClockMod, Interval) ->
     {ok, EventPid } = gen_event:start_link(),
     CallbackFun = fun(NewAggregate) ->
         gen_event:notify(
             EventPid,
-            {emit, Mod:emit(NewAggregate)}
+            {emit, AggMod:emit(NewAggregate)}
         )
     end,
+    State = new(AggMod, ClockMod, CallbackFun, Interval),
+    spawn(?MODULE, loop, [State]).
 
-  {_, Clock} = eep_clock_wall:tick(eep_clock_wall:new(Interval)),
-  spawn(?MODULE, loop, [#state{mod=Mod, clock=Clock, pid=EventPid, aggregate=Mod:init(), callback=CallbackFun, epoch=eep_clock_wall:ts(), interval=Interval}]).
+new(AggMod, CallbackFun, Interval) ->
+    new(AggMod, eep_clock_wall, [], CallbackFun, Interval).
 
--spec new(Mod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
-new(Mod, CallbackFun, Interval) ->
-    {_, Clock} = eep_clock_wall:tick(eep_clock_wall:new(Interval)),
-    #state{mod=Mod, clock=Clock, aggregate=Mod:init(), callback=CallbackFun, epoch=eep_clock_wall:ts(),interval=Interval}.
+-spec new(AggMod::module(), ClockMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
+new(AggMod, ClockMod, CallbackFun, Interval) ->
+    new(AggMod, ClockMod, [], CallbackFun, Interval).
 
--spec new(Mod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
-new(Mod, Seed, CallbackFun, Interval) ->
-    {_, Clock} = eep_clock_wall:tick(eep_clock_wall:new(Interval)),
-    #state{mod=Mod, seed=Seed, clock=Clock, aggregate=Mod:init(Seed), callback=CallbackFun, epoch=eep_clock_wall:ts(),interval=Interval}.
+-spec new(AggMod::module(), ClockMod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
+new(AggMod, ClockMod, Seed, CallbackFun, Interval) ->
+    Clock = ClockMod:new(Interval),
+    #state{agg_mod=AggMod, aggregate=AggMod:init(Seed), seed=Seed,
+           clock_mod=ClockMod, clock=Clock, interval=Interval,
+           callback=CallbackFun}.
 
 -spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
 push(State, Event) ->
@@ -95,25 +102,21 @@ loop(#state{pid=EventPid}=State) ->
       loop(State)
   end.
 
-accum(#state{mod=Mod, clock=Clock, aggregate=Agg}=State,Event) ->
-    {noop, State#state{
-        mod=Mod,
-        clock=eep_clock_wall:inc(Clock),
-        aggregate=Mod:accumulate(Agg, Event)
-    }}.
+accum(#state{agg_mod=AggMod, aggregate=Agg}=State,Event) ->
+    {noop, State#state{ aggregate=AggMod:accumulate(Agg, Event) }}.
 
-tick(#state{mod=Mod, seed=Seed, aggregate=Agg,clock=Clock,callback=CallbackFun,epoch=Epoch, interval=Interval}=State) ->
-    { Ticked, Tocked } =  eep_clock_wall:tick(Clock),
+tick(#state{callback=CallbackFun, agg_mod=AggMod, aggregate=Agg, seed=Seed,
+            clock_mod=CkMod, clock=Clock}=State) ->
+    { Ticked, Tocked } =  CkMod:tick(Clock),
     case Ticked of
         true ->
-            case eep_clock_wall:tock(Tocked,Epoch) of
+            case CkMod:tock(Tocked) of
                 {true, Clock1} ->
                     CallbackFun(Agg),
-                    {emit,State#state{aggregate=Mod:init(Seed),clock=Clock1, epoch=(Epoch+Interval)}};
+                    {emit,State#state{aggregate=AggMod:init(Seed),clock=Clock1}};
                 {false, _Clock1} ->
-                    {noop,State#state{aggregate=Mod:init(Seed),clock=Tocked, epoch=Epoch}}
+                    {noop,State#state{aggregate=AggMod:init(Seed),clock=Tocked}}
             end;
         false ->
-            {noop,State}
+            {noop,State#state{clock=Tocked}}
     end.
-    

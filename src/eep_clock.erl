@@ -26,10 +26,17 @@
 
 -module(eep_clock).
 
--export([behaviour_info/1]).
+-include_lib("eep_erl.hrl").
 
-behaviour_info(callbacks) ->
-  [ {name, 0} , {at, 1}, {new, 1}, {inc, 1}, {tick, 1}, {tock, 2} ];
-
-behaviour_info(_) ->
-  undefined.
+-callback name() ->
+    Name :: atom().
+-callback at(ck_state()) ->
+    Now :: integer().
+-callback new(Interval :: integer()) ->
+    ck_state().
+-callback inc(Old :: ck_state()) ->
+    New :: ck_state().
+-callback tick(Old :: ck_state()) ->
+    {Tocked :: boolean(), New :: ck_state()}.
+-callback tock(Old :: ck_state()) ->
+    {Tocked :: boolean(), New :: ck_state()}.
