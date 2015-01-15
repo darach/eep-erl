@@ -28,6 +28,8 @@
 
 -include_lib("eep_erl.hrl").
 
+-export([tick/2]).
+
 -callback name() ->
     Name :: atom().
 -callback at(ck_state()) ->
@@ -40,3 +42,11 @@
     {Tocked :: boolean(), New :: ck_state()}.
 -callback tock(Old :: ck_state()) ->
     {Tocked :: boolean(), New :: ck_state()}.
+
+tick(CkMod, Clock) ->
+    case CkMod:tick(Clock) of
+        {false, UnTicked} -> {noop, UnTicked};
+        {true, Ticked} ->
+            {_, Tocked} = CkMod:tock(Ticked),
+            {tock, Tocked}
+    end.
