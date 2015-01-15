@@ -228,9 +228,9 @@ t_win_periodic_inline(_Config) ->
     W0 = eep_window_periodic:new(eep_stats_count, fun(_) -> boop end, 0),
     {noop,W1} = eep_window_periodic:push(W0,foo),
     {noop,W2} = eep_window_periodic:push(W1,bar),
-    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},2,_,undefined} = W2,
+    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},2,_} = W2,
     {emit,W3} = eep_window_periodic:tick(W2),
-    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_,undefined} = W3,
+    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_} = W3,
     {noop,W4} = eep_window_periodic:push(W3,foo),
     {noop,W5} = eep_window_periodic:push(W4,bar),
     {noop,W6} = eep_window_periodic:push(W5,foo),
@@ -238,7 +238,7 @@ t_win_periodic_inline(_Config) ->
     {noop,W8} = eep_window_periodic:push(W7,foo),
     {noop,W9} = eep_window_periodic:push(W8,bar),
     {emit,W10} = eep_window_periodic:tick(W9),
-    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_,undefined} = W10,
+    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_} = W10,
     ok.
 
 t_win_periodic_process(_Config) ->
@@ -247,12 +247,12 @@ t_win_periodic_process(_Config) ->
   Pid ! {push, bar},
   Pid ! {debug, self()},
   receive
-    { debug, Debug0 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},2,_,_} = Debug0
+    { debug, Debug0 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},2,_} = Debug0
   end,
   Pid ! tick,
   Pid ! {debug, self()},
   receive
-    { debug, Debug1 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_,_} = Debug1
+    { debug, Debug1 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_} = Debug1
   end,
   Pid ! {push, foo},
   Pid ! {push, bar},
@@ -262,12 +262,12 @@ t_win_periodic_process(_Config) ->
   Pid ! {push, bar},
   Pid ! {debug, self()},
   receive
-    { debug, Debug2 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},6,_,_} = Debug2
+    { debug, Debug2 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},6,_} = Debug2
   end,
   Pid ! tick,
   Pid ! {debug, self()},
   receive
-    { debug, Debug3 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_,_} = Debug3
+    { debug, Debug3 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_} = Debug3
   end,
   Pid ! stop.
 
@@ -275,9 +275,9 @@ t_win_monotonic_inline(_Config) ->
     W0 = eep_window_monotonic:new(eep_stats_count, eep_clock_count, fun(_) -> boop end, 0),
     {noop,W1} = eep_window_monotonic:push(W0,foo),
     {noop,W2} = eep_window_monotonic:push(W1,bar),
-    {state,undefined,eep_stats_count,[],eep_clock_count,{eep_clock,3,0,0},2,_,undefined} = W2,
+    {state,undefined,eep_stats_count,[],eep_clock_count,{eep_clock,3,0,0},2,_} = W2,
     {emit,W3} = eep_window_monotonic:tick(W2),
-    {state,undefined,eep_stats_count,[],eep_clock_count,{eep_clock,_,_,0},0,_,undefined} = W3,
+    {state,undefined,eep_stats_count,[],eep_clock_count,{eep_clock,_,_,0},0,_} = W3,
     {noop,W4} = eep_window_monotonic:push(W3,foo),
     {noop,W5} = eep_window_monotonic:push(W4,bar),
     {noop,W6} = eep_window_monotonic:push(W5,foo),
@@ -285,7 +285,7 @@ t_win_monotonic_inline(_Config) ->
     {noop,W8} = eep_window_monotonic:push(W7,foo),
     {noop,W9} = eep_window_monotonic:push(W8,bar),
     {emit,W10} = eep_window_monotonic:tick(W9),
-    {state,undefined,eep_stats_count,[],eep_clock_count,{eep_clock,_,_,0},0,_,undefined} = W10,
+    {state,undefined,eep_stats_count,[],eep_clock_count,{eep_clock,_,_,0},0,_} = W10,
     ok.
 
 t_win_monotonic_process(_config) ->
@@ -294,12 +294,12 @@ t_win_monotonic_process(_config) ->
     Pid ! {push, bar},
     Pid ! {debug, self()},
     receive
-    { debug, Debug0 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,3,0,0},2,_,_}  = Debug0
+    { debug, Debug0 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,3,0,0},2,_}  = Debug0
     end,
     Pid ! tick,
     Pid ! {debug, self()},
     receive
-    { debug, Debug1 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,4,0,0},0,_,_}  = Debug1
+    { debug, Debug1 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,4,0,0},0,_}  = Debug1
     end,
     Pid ! {push, foo},
     Pid ! {push, bar},
@@ -309,12 +309,12 @@ t_win_monotonic_process(_config) ->
     Pid ! {push, bar},
     Pid ! {debug, self()},
     receive
-    { debug, Debug2 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,10,0,0},6,_,_}  = Debug2
+    { debug, Debug2 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,10,0,0},6,_}  = Debug2
     end,
     Pid ! tick,
     Pid ! {debug, self()},
     receive
-    { debug, Debug3 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,11,0,0},0,_,_}  = Debug3
+    { debug, Debug3 } -> {state,undefined,eep_stats_count,[],eep_clock_count, {eep_clock,11,0,0},0,_}  = Debug3
     end,
     Pid ! stop.
 
