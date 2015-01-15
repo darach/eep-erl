@@ -242,7 +242,7 @@ t_win_periodic_inline(_Config) ->
     ok.
 
 t_win_periodic_process(_Config) ->
-  Pid = eep_window_periodic:start(eep_stats_count, 0),
+  Pid = eep_window:start(eep_window_periodic, eep_stats_count, 0),
   Pid ! {push, foo},
   Pid ! {push, bar},
   Pid ! {debug, self()},
@@ -289,7 +289,7 @@ t_win_monotonic_inline(_Config) ->
     ok.
 
 t_win_monotonic_process(_config) ->
-    Pid = eep_window_monotonic:start(eep_stats_count, eep_clock_count, 0),
+    Pid = eep_window:start(eep_window_monotonic, eep_stats_count, eep_clock_count, 0),
     Pid ! {push, foo},
     Pid ! {push, bar},
     Pid ! {debug, self()},
