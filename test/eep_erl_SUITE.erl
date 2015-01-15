@@ -333,4 +333,4 @@ t_monotonic_clock_count(_) ->
     ?proptest(prop_eep:prop_monotonic_clock_count()).
 
 t_periodic_window(_) ->
-    ?proptest(prop_eep:prop_monotonic_clock_count()).
+    ?proptest(prop_eep:prop_periodic_window()).
