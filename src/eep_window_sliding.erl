@@ -72,14 +72,10 @@ slide(#state{mod=Mod, size=Size, aggregate=Aggregate,count=Count,callback=Callba
         Count < Size ->
             NewPrior = Prior ++ [Event],
             {noop,State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
-        Count == Size ->
-            NewPrior = Prior ++ [Event],
-            CallbackFun(NewAggregate),
-            {emit,State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
         true ->
-            Value = lists:nth(1,Prior),
+            [Value | PriorTl] = Prior,
             NewAggregate2 = Mod:compensate(NewAggregate, Value),
             CallbackFun(NewAggregate2),
-            NewPrior = erlang:tl(Prior) ++ [Event],
+            NewPrior = PriorTl ++ [Event],
             {emit,State#state{aggregate=NewAggregate2,count=Count+1,prior=NewPrior}}
     end.
