@@ -28,8 +28,6 @@
 
 -include_lib("eep_erl.hrl").
 
--export([start/2]).
--export([start/3]).
 -export([new/3]).
 -export([new/4]).
 -export([new/5]).
@@ -45,19 +43,6 @@
     aggregate :: any(),
     callback = undefined :: fun((...) -> any())
 }).
-
-start(AggMod, Interval) ->
-    start(AggMod, eep_clock_wall, Interval).
-start(AggMod, ClockMod, Interval) ->
-    {ok, EventPid } = gen_event:start_link(),
-    CallbackFun = fun(NewAggregate) ->
-        gen_event:notify(
-            EventPid,
-            {emit, AggMod:emit(NewAggregate)}
-        )
-    end,
-    State = new(AggMod, ClockMod, CallbackFun, Interval),
-    spawn(eep_window, loop, [?MODULE, EventPid, State]).
 
 new(AggMod, CallbackFun, Interval) ->
     new(AggMod, eep_clock_wall, [], CallbackFun, Interval).

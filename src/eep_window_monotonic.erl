@@ -1,5 +1,5 @@
 %% -------------------------------------------------------------------
-%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com > 
+%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com >
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy of this software and associated documentation files (the
@@ -32,7 +32,6 @@
 
 -include_lib("eep_erl.hrl").
 
--export([start/3]).
 -export([new/4]).
 -export([new/5]).
 -export([tick/1]).
@@ -47,26 +46,6 @@
     aggregate :: any(),
     callback = undefined :: fun((...) -> any())
 }).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Start the monotonic window with the given conflation module, Mod, the
-%% given clock module, ClockMod, and the given clock Interval.
-%% @end
-%%--------------------------------------------------------------------
-
--spec start(Mod::module(), ClockMod::module(), Interval::integer()) -> pid().
-
-start(Mod, ClockMod, Interval) ->
-    {ok, EventPid } = gen_event:start_link(),
-    CallbackFun = fun(NewAggregate) ->
-        gen_event:notify(
-            EventPid,
-            {emit, Mod:emit(NewAggregate)}
-        )
-    end,
-    State = ?MODULE:new(Mod, ClockMod, CallbackFun, Interval),
-    spawn(eep_window, loop, [?MODULE, EventPid, State]).
 
 -spec new(Mod::module(), ClockMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(Mod, ClockMod, CallbackFun, Interval) ->
