@@ -32,6 +32,7 @@
 
 -include_lib("eep_erl.hrl").
 
+-export([start/3]).
 -export([new/4]).
 -export([new/5]).
 -export([tick/1]).
@@ -46,6 +47,9 @@
     aggregate :: any(),
     callback = undefined :: fun((...) -> any())
 }).
+
+start(Mod, ClockMod, Interval) ->
+    eep_window:start(?MODULE, Mod, ClockMod, Interval).
 
 -spec new(Mod::module(), ClockMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(Mod, ClockMod, CallbackFun, Interval) ->
