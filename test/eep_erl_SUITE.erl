@@ -134,21 +134,21 @@ t_clock_count(_Config) ->
 
 t_win_tumbling_inline(_Config) ->
     W0  = eep_window_tumbling:new(eep_stats_count, fun(_Callback) -> boop end, 2),
-    {state,2,eep_stats_count,[],0,_,1,undefined} = W0,
+    {state,2,eep_stats_count,[],0,_,1} = W0,
     {noop,W1} = eep_window_tumbling:push(W0,foo),
     {emit,W2} = eep_window_tumbling:push(W1,bar),
     {noop,W3} = eep_window_tumbling:push(W2,baz),
     {emit,W4} = eep_window_tumbling:push(W3,bar),
-    {state,2,eep_stats_count,[],0,_,1,undefined} = W4,
+    {state,2,eep_stats_count,[],0,_,1} = W4,
     {noop,W5} = eep_window_tumbling:push(W4,foo),
-    {state,2,eep_stats_count,[],1,_,2,undefined} = W5,
+    {state,2,eep_stats_count,[],1,_,2} = W5,
     {emit,W6} = eep_window_tumbling:push(W5,bar),
     {noop,W7} = eep_window_tumbling:push(W6,foo),
     {emit,W8} = eep_window_tumbling:push(W7,bar),
     {noop,W9} = eep_window_tumbling:push(W8,foo),
-    {state,2,eep_stats_count,[],0,_,1,undefined} = W8,
+    {state,2,eep_stats_count,[],0,_,1} = W8,
     {emit,W10} = eep_window_tumbling:push(W9,bar),
-    {state,2,eep_stats_count,[],0,_,1,undefined} = W10,
+    {state,2,eep_stats_count,[],0,_,1} = W10,
     ok.
 
 t_win_tumbling_process(_Config) ->
@@ -157,12 +157,12 @@ t_win_tumbling_process(_Config) ->
     Pid ! {push, bar},
     Pid ! {debug, self()},
     receive
-	    { debug, Debug0 } -> {state, 2, eep_stats_count, [], 0, _, 1, _} = Debug0
+	    { debug, Debug0 } -> {state, 2, eep_stats_count, [], 0, _, 1} = Debug0
     end,
     Pid ! {push, baz},
     Pid ! {debug, self()},
     receive
-	    { debug, Debug1 } -> {state, 2, eep_stats_count, [], 1, _, 2, _} = Debug1
+	    { debug, Debug1 } -> {state, 2, eep_stats_count, [], 1, _, 2} = Debug1
     end,
     Pid ! {push, foo},
     Pid ! {push, bar},
@@ -172,11 +172,11 @@ t_win_tumbling_process(_Config) ->
     Pid ! {push, bar},
     Pid ! {debug, self()},
     receive
-	    { debug, Debug2 } -> {state, 2, eep_stats_count, [], 1, _, 2, _} = Debug2
+	    { debug, Debug2 } -> {state, 2, eep_stats_count, [], 1, _, 2} = Debug2
     end,
     Pid ! {debug, self()},
     receive
-	    { debug, Debug3 } -> {state, 2, eep_stats_count, [], 1, _, 2, _} = Debug3
+	    { debug, Debug3 } -> {state, 2, eep_stats_count, [], 1, _, 2} = Debug3
     end,
     Pid ! stop.
 

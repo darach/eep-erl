@@ -63,17 +63,13 @@
 -export([new/4]).
 -export([push/2]).
 
-%% @private.
--export([loop/1]).
-
 -record(state, {
     size :: integer(),
     mod :: module(),
     seed = [] :: list(),
     aggregate :: any(),
     callback = undefined :: fun((...) -> any()),
-    count = 1 :: integer(),
-    pid :: pid()
+    count = 1 :: integer()
 }).
 
 %%--------------------------------------------------------------------
@@ -93,7 +89,8 @@ start(Mod, Size) ->
             {emit, Mod:emit(NewAggregate)}
         )
     end,
-    spawn(?MODULE, loop, [#state{mod=Mod, size=Size, pid=EventPid, count=1, aggregate=Mod:init(), callback=CallbackFun}]).
+    State = new(Mod, CallbackFun, Size),
+    spawn(eep_window, loop, [?MODULE, EventPid, State]).
 
 %%
 %%
@@ -114,30 +111,6 @@ new(Mod, Seed, CallbackFun, Size) ->
 push(State, Event) ->
     tumble(State, Event).
     
-%%--------------------------------------------------------------------
-%% @doc
-%% @end
-%%--------------------------------------------------------------------
-
--spec loop(State::#state{}) -> ok.
-loop(#state{pid=EventPid}=State) ->
-    receive
-	{ push, Event } ->
-        {_,NewState} = tumble(State,Event),
-        loop(NewState);
-	{ add_handler, Handler, Arr } ->
-	    gen_event:add_handler(EventPid, Handler, Arr),
-	    loop(State);
-	{ delete_handler, Handler } ->
-	    gen_event:delete_handler(EventPid, Handler, []),
-	    loop(State);
-	stop ->
-	    ok;
-	{debug, From} ->
-	    From ! {debug, State},
-	    loop(State)
-    end.
-
 tumble(#state{mod=Mod, seed=Seed, size=Size, aggregate=Aggregate,count=Count,callback=CallbackFun}=State,Event) ->
 	NewAggregate = Mod:accumulate(Aggregate, Event),
 	case Count >= Size of
