@@ -68,7 +68,7 @@ accum(#state{agg_mod=AggMod, aggregate=Agg}=State,Event) ->
 tick(#state{callback=CallbackFun, agg_mod=AggMod, aggregate=Agg, seed=Seed,
             clock_mod=CkMod, clock=Clock}=State) ->
     case eep_clock:tick(CkMod, Clock) of
-        {noop, Clock} -> {noop, State#state{clock=Clock}};
+        {noop, Clock2} -> {noop, State#state{clock=Clock2}};
         {tock, Tocked} ->
             CallbackFun(Agg),
             {emit, State#state{aggregate=AggMod:init(Seed), clock=Tocked}}
