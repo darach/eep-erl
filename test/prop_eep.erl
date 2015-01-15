@@ -111,15 +111,15 @@ window_handle(tick, {Window, Results}) ->
 prop_monotonic_sliding_window() ->
     ?FORALL({Size, Integers}, {pos_integer(), non_empty(list(integer()))},
             begin
-                Win = {eep_stats_sum:init(), Size, 0, [], none},
+                Win = {eep_stats_sum:init(), Size, 1, [], none},
                 %% TODO Refactor eep_window_sliding so we can use it directly here
                 %% and not replicate its inner machinations below.
                 WinFinal = lists:foldl(fun slide/2, Win, Integers),
                 {_, Size, _, _, Emission} = WinFinal,
                 if
                     % We expect no emission if the input list is less than our window size
-                    Size >= length(Integers) -> Emission == none;
-                    Size < length(Integers) ->
+                    Size > length(Integers) -> Emission == none;
+                    Size =< length(Integers) ->
                         %% If Size is smaller than the number of input integers,
                         %% the accumulated value will only be the sum of the
                         %% last Size integers.
@@ -136,9 +136,11 @@ slide(Int, {Agg, Size, Count, Prior, LastEmission}) ->
         Count < Size ->
             NewPrior = Prior ++ [Int],
             {NewAgg, Size, Count+1, NewPrior, LastEmission};
+        Count == Size ->
+            NewPrior = Prior ++ [Int],
+            {NewAgg, Size, Count+1, NewPrior, eep_stats_sum:emit(NewAgg)};
         true ->
             [Value | Tail] = Prior,
             NewAgg2 = eep_stats_sum:compensate(NewAgg, Value),
-            NewPrior = Tail ++ [Int],
-            {NewAgg2, Size, Count+1, NewPrior, eep_stats_sum:emit(NewAgg2)}
+            NewPrior = Tail ++ [Int], {NewAgg2, Size, Count+1, NewPrior, eep_stats_sum:emit(NewAgg2)}
     end.

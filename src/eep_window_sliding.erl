@@ -62,7 +62,6 @@ new(Mod, CallbackFun, Size) ->
 new(Mod, Seed, CallbackFun, Size) ->
     #state{size=Size, seed=Seed, mod=Mod, callback=CallbackFun, aggregate=Mod:init(Seed)}.
 
-
 push(State, Event) ->
     slide(State, Event).
 
@@ -72,6 +71,10 @@ slide(#state{mod=Mod, size=Size, aggregate=Aggregate,count=Count,callback=Callba
         Count < Size ->
             NewPrior = Prior ++ [Event],
             {noop,State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
+        Count == Size ->
+            NewPrior = Prior ++ [Event],
+            CallbackFun(NewAggregate),
+            {emit, State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
         true ->
             [Value | PriorTl] = Prior,
             NewAggregate2 = Mod:compensate(NewAggregate, Value),
