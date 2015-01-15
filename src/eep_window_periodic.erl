@@ -36,8 +36,6 @@
 -export([tick/1]).
 -export([push/2]).
 
--export([loop/1]).
-
 -record(state, {
     interval :: integer(),
     agg_mod :: module(),
@@ -45,8 +43,7 @@
     seed = [] :: list(),
     clock,
     aggregate :: any(),
-    callback = undefined :: fun((...) -> any()),
-    pid :: pid()
+    callback = undefined :: fun((...) -> any())
 }).
 
 start(AggMod, Interval) ->
@@ -60,7 +57,7 @@ start(AggMod, ClockMod, Interval) ->
         )
     end,
     State = new(AggMod, ClockMod, CallbackFun, Interval),
-    spawn(?MODULE, loop, [State]).
+    spawn(eep_window, loop, [?MODULE, EventPid, State]).
 
 new(AggMod, CallbackFun, Interval) ->
     new(AggMod, eep_clock_wall, [], CallbackFun, Interval).
@@ -79,28 +76,6 @@ new(AggMod, ClockMod, Seed, CallbackFun, Interval) ->
 -spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
 push(State, Event) ->
     accum(State, Event).
-
-%% @private.
-loop(#state{pid=EventPid}=State) ->
-  receive
-    tick ->
-      {_,NewState} = tick(State),
-      loop(NewState);
-    { push, Event } ->
-      {_,NewState} = accum(State,Event),
-      loop(NewState);
-    { add_handler, Handler, Arr } ->
-      gen_event:add_handler(EventPid, Handler, Arr),
-      loop(State);
-    { delete_handler, Handler } ->
-      gen_event:delete_handler(EventPid, Handler, []),
-      loop(State);
-    stop ->
-      ok;
-    {debug, From} ->
-      From ! {debug, State},
-      loop(State)
-  end.
 
 accum(#state{agg_mod=AggMod, aggregate=Agg}=State,Event) ->
     {noop, State#state{ aggregate=AggMod:accumulate(Agg, Event) }}.
