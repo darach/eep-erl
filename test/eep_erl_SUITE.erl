@@ -43,7 +43,9 @@
 -export([t_win_monotonic_process/1]).
 -export([t_seedable_aggregate/1]).
 -export([t_avg_aggregate_accum/1]).
+-export([t_sum_aggregate_accum/1]).
 -export([t_monotonic_clock_count/1]).
+-export([t_monotonic_sliding_window/1]).
 -export([t_periodic_window/1]).
 
 -include("eep_erl.hrl").
@@ -93,7 +95,9 @@ groups() ->
             ]},
         {props, [], [
             t_avg_aggregate_accum,
+            t_sum_aggregate_accum,
             t_monotonic_clock_count,
+            t_monotonic_sliding_window,
             t_periodic_window
             ]}
     ].
@@ -329,8 +333,14 @@ t_seedable_aggregate(_Config) ->
 t_avg_aggregate_accum(_) ->
     ?proptest(prop_eep:prop_avg_aggregate_accum()).
 
+t_sum_aggregate_accum(_) ->
+    ?proptest(prop_eep:prop_sum_aggregate_accum()).
+
 t_monotonic_clock_count(_) ->
     ?proptest(prop_eep:prop_monotonic_clock_count()).
 
 t_periodic_window(_) ->
     ?proptest(prop_eep:prop_periodic_window()).
+
+t_monotonic_sliding_window(_) ->
+    ?proptest(prop_eep:prop_monotonic_sliding_window()).
