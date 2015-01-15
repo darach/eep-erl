@@ -246,7 +246,7 @@ t_win_periodic_inline(_Config) ->
     ok.
 
 t_win_periodic_process(_Config) ->
-  Pid = eep_window:start(eep_window_periodic, eep_stats_count, 0),
+  Pid = eep_window_periodic:start(eep_stats_count, 0),
   Pid ! {push, foo},
   Pid ! {push, bar},
   Pid ! {debug, self()},
