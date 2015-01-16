@@ -68,7 +68,6 @@ prop_sum_aggregate_accum() ->
                       end, {0, eep_stats_sum:init()}, Ints),
                     RealSum == eep_stats_sum:emit(AggData)
             end).
-
 prop_monotonic_clock_count() ->
     ?FORALL({Interval, Events},
             {pos_integer(), list(tick)},
