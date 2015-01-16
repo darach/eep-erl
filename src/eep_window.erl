@@ -30,6 +30,23 @@
 
 -export([loop/3]).
 
+-export([tumbling/5]).
+-export([sliding/5]).
+-export([push/2]).
+
+-record(win,
+        {
+         type :: tumbling | sliding,
+         by :: events | ticks,
+         compensating :: boolean(),
+         size :: pos_integer(),
+         aggmod :: module(),
+         agg :: any(),
+         seed = [] :: list(),
+         count = 1,
+         events = []
+        }).
+
 start(Window, AggMod, Interval) ->
     start(Window, AggMod, eep_clock_wall, Interval).
 start(Window, AggMod, ClockMod, Interval) ->
@@ -63,3 +80,57 @@ loop(Window, EventPid, State) ->
       From ! {debug, State},
       loop(Window, EventPid, State)
   end.
+
+
+tumbling(none, events, Size, Aggregate, Seed) ->
+    #win{type=tumbling, by=events, compensating=false,
+         size=Size, aggmod=Aggregate, agg=(Aggregate:init(Seed))}.
+
+sliding(none, events, Size, Aggregate, Seed) ->
+    #win{type=sliding, by=events, compensating=true,
+         size=Size, aggmod=Aggregate, agg=(Aggregate:init(Seed))}.
+
+push(Event, #win{type=sliding, by=events}=Win) ->
+    #win{count=Count, size=Size} = Win,
+    Actions = slide(Count, Size),
+    decide(Actions, Event, Win);
+push(Event, #win{type=tumbling, by=events}=Win) ->
+    #win{count=Count, size=Size} = Win,
+    Actions = tumble(Count, Size),
+    decide(Actions, Event, Win).
+
+
+tumble(Count, Size) when Count  < Size -> [accumulate];
+tumble(Count, Size) when Count >= Size -> [accumulate, emit, reset].
+
+slide(Count, Size) when Count  < Size -> [accumulate];
+slide(Count, Size) when Count == Size -> [accumulate, emit];
+slide(Count, Size) when Count  > Size -> [accumulate, compensate, emit].
+
+accumulate(Event, #win{aggmod=AMod, agg=Agg, count=Count}=Win) ->
+    Accumed = Win#win{agg=(AMod:accumulate(Agg, Event)), count=Count+1},
+    if Win#win.compensating -> %% If we're to compensate we must store the events
+           Accumed#win{events= Win#win.events++[Event]};
+       true ->
+           Accumed
+    end.
+
+compensate(#win{aggmod=AMod, agg=Agg, events=[Oldest|Es]}=Win) ->
+    Win#win{agg=(AMod:compensate(Agg, Oldest)), events=Es}.
+
+reset(#win{aggmod=AMod, seed=Seed}=Win) ->
+    Win#win{agg=(AMod:init(Seed)), count=1}.
+
+decide(Actions, Event, Window) ->
+    decide(Actions, Event, Window, noop).
+
+decide([], _, Window, Decision) -> {Decision, Window};
+decide([accumulate|Actions], Event, Window, Decision) ->
+    decide(Actions, Event, accumulate(Event, Window), Decision);
+decide([compensate|Actions], Event, Window, Decision) ->
+    decide(Actions, Event, compensate(Window), Decision);
+decide([reset|Actions], Event, Window, Decision) ->
+    decide(Actions, Event, reset(Window), Decision);
+decide([emit|Actions], Event, Window, noop) ->
+    %% TODO This enforces only one emission per decision: is this right?
+    decide(Actions, Event, Window, {emit, Window#win.agg}).
