@@ -33,6 +33,7 @@
 -export([prop_monotonic_clock_count/0]).
 -export([prop_monotonic_sliding_window/0]).
 -export([prop_periodic_window/0]).
+-export([prop_sliding_window/0]).
 
 -define(epsilon, 1.0e-15).
 
@@ -152,3 +153,47 @@ slide(Int, {Agg, Size, Count, Prior, LastEmission}) ->
             NewAgg2 = eep_stats_sum:compensate(NewAgg, Value),
             NewPrior = Tail ++ [Int], {NewAgg2, Size, Count+1, NewPrior, eep_stats_sum:emit(NewAgg2)}
     end.
+
+prop_tumbling_window() ->
+    ?FORALL({Size, Integers}, {pos_integer(), non_empty(list(integer()))},
+            begin
+                W0 = eep_window:tumbling(none, events, Size, eep_stats_sum, []),
+                {_Wn, As} = lists:foldl(fun winfold/2, {W0, []}, Integers),
+                Emissions = [ eep_stats_sum:emit(A) || {emit,A} <- As],
+                Noops = [noop || noop <- As],
+                ExpEmissions = expected(Size, Integers),
+                %% Number of 'emit' should be length(Integers) div Size
+                length(Emissions) == length(Integers) div Size
+                    %% The rest should have been noop
+                    andalso length(Noops) == length(Integers) - length(Emissions)
+                    %% The emitted values should match our expectation
+                    %% (see expected/2 below)
+                    andalso Emissions == ExpEmissions
+            end).
+
+prop_sliding_window() ->
+    ?FORALL({Size, Integers}, {pos_integer(), non_empty(list(integer()))},
+            begin
+                W0 = eep_window:sliding(none, events, Size, eep_stats_count, []),
+                {_Wn, As} = lists:foldl(fun winfold/2, {W0, []}, Integers),
+                %% Expected: we emit for every event, except before we reach Size
+                %% events;
+                ExpEmissions = lists:duplicate(max(0, length(Integers) - Size + 1), Size),
+                Emissions = [ eep_stats_count:emit(A) || {emit, A} <- As ],
+                Noops = [ noop || noop <- As ],
+                Emissions == ExpEmissions
+                    andalso length(Noops) =< Size - 1
+            end).
+
+winfold(Ev, {Win, As}) ->
+    {A, Win1} = eep_window:push(Ev, Win),
+    {Win1, As++[A]}.
+
+expected(WinSize, Integers) ->
+    lists:reverse(expected(WinSize, Integers, [])).
+expected(WinSize, Integers, SoFar)
+  when WinSize > length(Integers) ->
+    SoFar;
+expected(WinSize, Integers, SoFar) ->
+    Window = lists:sublist(Integers, 1, WinSize),
+    expected(WinSize, lists:nthtail(WinSize, Integers), [lists:sum(Window) | SoFar]).

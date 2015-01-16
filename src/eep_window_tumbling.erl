@@ -93,31 +93,20 @@ start(Mod, Size) ->
     spawn(eep_window, loop, [?MODULE, EventPid, State]).
 
 %%
-%%
-%%
 -spec new(Mod::module(), CallbackFun::fun((...) -> any()), Size::integer()) ->#state{}.
 new(Mod, CallbackFun, Size) ->
-    #state{size = Size, seed=[], mod = Mod, callback = CallbackFun, aggregate=Mod:init()}. 
+    {CallbackFun, eep_window:tumbling(none, events, Size, Mod, [])}.
 
 -spec new(Mod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Size::integer()) ->#state{}.
 new(Mod, Seed, CallbackFun, Size) ->
-    #state{size = Size, seed=Seed, mod = Mod, callback = CallbackFun, aggregate=Mod:init(Seed)}. 
+    {CallbackFun, eep_window:tumbling(none, events, Size, Mod, Seed)}.
 
-%%
-%%
-%%
-%%
--spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
-push(State, Event) ->
-    tumble(State, Event).
-    
-tumble(#state{mod=Mod, seed=Seed, size=Size, aggregate=Aggregate,count=Count,callback=CallbackFun}=State,Event) ->
-	NewAggregate = Mod:accumulate(Aggregate, Event),
-	case Count >= Size of
-	false -> 
-        {noop,State#state{aggregate=NewAggregate,count=Count+1}};
-	true ->	
-        CallbackFun(NewAggregate),
-        {emit,State#state{aggregate=Mod:init(Seed),count=1}}
-	end.
-
+%-spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
+push({CBFun, Window}, Event) ->
+    case eep_window:push(Event, Window) of
+        {noop, Window1} ->
+            {noop, {CBFun, Window1}};
+        {{emit, Emission}, Window1} ->
+            CBFun(Emission),
+            {emit, {CBFun, Window1}}
+    end.
