@@ -32,20 +32,29 @@
 -export([prop_monotonic_clock_count/0]).
 -export([prop_periodic_window/0]).
 
--define(epsilon, 1.0e-14).
+-define(epsilon, 1.0e-15).
 
 prop_avg_aggregate_accum() ->
     ?FORALL(Ints, non_empty(list(integer())),
             begin
-                {RealSum, RealCount, AggData} =
+                {RealSum, RealCount, MinInt, MaxInt, AggData} =
                     lists:foldl(
-                      fun(N, {Sum, Count, State}) ->
-                              {Sum+N, Count+1, eep_stats_avg:accumulate(State, N)}
-                      end, {0, 0, eep_stats_avg:init()}, Ints),
+                      fun(N, {Sum, Count, Min, Max, State}) ->
+                              {Sum+N, Count+1, min(Min, N), max(Max, N),
+                               eep_stats_avg:accumulate(State, N)}
+                      end, {0, 0, hd(Ints), hd(Ints), eep_stats_avg:init()}, Ints),
                 AggAvg = eep_stats_avg:emit(AggData),
                 RealAvg = RealSum / RealCount,
-                (AggAvg - RealAvg) < ?epsilon
+                %% ?epsilon fix: resize epsilon by the order of magnitude of
+                %% the difference between min and max
+                FudgeFactor = range_magnitude(MinInt, MaxInt),
+                abs(AggAvg - RealAvg) < ?epsilon * FudgeFactor
             end).
+
+range_magnitude(X, X) -> 1;
+range_magnitude(Min, Max) ->
+    Order = math:log10(abs(Max - Min)),
+    math:pow(10, Order).
 
 prop_monotonic_clock_count() ->
     ?FORALL({Interval, Events},
