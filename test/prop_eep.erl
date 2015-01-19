@@ -29,7 +29,9 @@
 -include_lib("proper/include/proper.hrl").
 
 -export([prop_avg_aggregate_accum/0]).
+-export([prop_sum_aggregate_accum/0]).
 -export([prop_monotonic_clock_count/0]).
+-export([prop_monotonic_sliding_window/0]).
 -export([prop_periodic_window/0]).
 
 -define(epsilon, 1.0e-14).
@@ -45,6 +47,17 @@ prop_avg_aggregate_accum() ->
                 AggAvg = eep_stats_avg:emit(AggData),
                 RealAvg = RealSum / RealCount,
                 (AggAvg - RealAvg) < ?epsilon
+            end).
+
+prop_sum_aggregate_accum() ->
+    ?FORALL(Ints, non_empty(list(integer())),
+            begin
+                {RealSum, AggData} =
+                    lists:foldl(
+                      fun(N, {Sum, State}) ->
+                              {Sum+N, eep_stats_sum:accumulate(State, N)}
+                      end, {0, eep_stats_sum:init()}, Ints),
+                    RealSum == eep_stats_sum:emit(AggData)
             end).
 
 prop_monotonic_clock_count() ->
@@ -94,3 +107,40 @@ window_handle({push, _}=Push, {Window, Results}) ->
 window_handle(tick, {Window, Results}) ->
     {Act, Ticked} = eep_window_periodic:tick(Window),
     {Ticked, Results ++ [Act]}.
+
+prop_monotonic_sliding_window() ->
+    ?FORALL({Size, Integers}, {pos_integer(), non_empty(list(integer()))},
+            begin
+                Win = {eep_stats_sum:init(), Size, 1, [], none},
+                %% TODO Refactor eep_window_sliding so we can use it directly here
+                %% and not replicate its inner machinations below.
+                WinFinal = lists:foldl(fun slide/2, Win, Integers),
+                {_, Size, _, _, Emission} = WinFinal,
+                if
+                    % We expect no emission if the input list is less than our window size
+                    Size > length(Integers) -> Emission == none;
+                    Size =< length(Integers) ->
+                        %% If Size is smaller than the number of input integers,
+                        %% the accumulated value will only be the sum of the
+                        %% last Size integers.
+                        Include = lists:sublist(lists:reverse(Integers), 1, Size),
+                        RealSum = lists:sum(Include),
+                        Emission == RealSum
+                end
+            end).
+
+%% NB This logic is copied directly from eep_window_sliding.erl
+slide(Int, {Agg, Size, Count, Prior, LastEmission}) ->
+    NewAgg = eep_stats_sum:accumulate(Agg, Int),
+    if
+        Count < Size ->
+            NewPrior = Prior ++ [Int],
+            {NewAgg, Size, Count+1, NewPrior, LastEmission};
+        Count == Size ->
+            NewPrior = Prior ++ [Int],
+            {NewAgg, Size, Count+1, NewPrior, eep_stats_sum:emit(NewAgg)};
+        true ->
+            [Value | Tail] = Prior,
+            NewAgg2 = eep_stats_sum:compensate(NewAgg, Value),
+            NewPrior = Tail ++ [Int], {NewAgg2, Size, Count+1, NewPrior, eep_stats_sum:emit(NewAgg2)}
+    end.

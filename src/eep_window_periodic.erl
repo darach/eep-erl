@@ -36,8 +36,6 @@
 -export([tick/1]).
 -export([push/2]).
 
--export([loop/1]).
-
 -record(state, {
     interval :: integer(),
     agg_mod :: module(),
@@ -45,22 +43,13 @@
     seed = [] :: list(),
     clock,
     aggregate :: any(),
-    callback = undefined :: fun((...) -> any()),
-    pid :: pid()
+    callback = undefined :: fun((...) -> any())
 }).
 
 start(AggMod, Interval) ->
     start(AggMod, eep_clock_wall, Interval).
 start(AggMod, ClockMod, Interval) ->
-    {ok, EventPid } = gen_event:start_link(),
-    CallbackFun = fun(NewAggregate) ->
-        gen_event:notify(
-            EventPid,
-            {emit, AggMod:emit(NewAggregate)}
-        )
-    end,
-    State = new(AggMod, ClockMod, CallbackFun, Interval),
-    spawn(?MODULE, loop, [State]).
+    eep_window:start(?MODULE, AggMod, ClockMod, Interval).
 
 new(AggMod, CallbackFun, Interval) ->
     new(AggMod, eep_clock_wall, [], CallbackFun, Interval).
@@ -80,43 +69,14 @@ new(AggMod, ClockMod, Seed, CallbackFun, Interval) ->
 push(State, Event) ->
     accum(State, Event).
 
-%% @private.
-loop(#state{pid=EventPid}=State) ->
-  receive
-    tick ->
-      {_,NewState} = tick(State),
-      loop(NewState);
-    { push, Event } ->
-      {_,NewState} = accum(State,Event),
-      loop(NewState);
-    { add_handler, Handler, Arr } ->
-      gen_event:add_handler(EventPid, Handler, Arr),
-      loop(State);
-    { delete_handler, Handler } ->
-      gen_event:delete_handler(EventPid, Handler, []),
-      loop(State);
-    stop ->
-      ok;
-    {debug, From} ->
-      From ! {debug, State},
-      loop(State)
-  end.
-
 accum(#state{agg_mod=AggMod, aggregate=Agg}=State,Event) ->
     {noop, State#state{ aggregate=AggMod:accumulate(Agg, Event) }}.
 
 tick(#state{callback=CallbackFun, agg_mod=AggMod, aggregate=Agg, seed=Seed,
             clock_mod=CkMod, clock=Clock}=State) ->
-    { Ticked, Tocked } =  CkMod:tick(Clock),
-    case Ticked of
-        true ->
-            case CkMod:tock(Tocked) of
-                {true, Clock1} ->
-                    CallbackFun(Agg),
-                    {emit,State#state{aggregate=AggMod:init(Seed),clock=Clock1}};
-                {false, _Clock1} ->
-                    {noop,State#state{aggregate=AggMod:init(Seed),clock=Tocked}}
-            end;
-        false ->
-            {noop,State#state{clock=Tocked}}
+    case eep_clock:tick(CkMod, Clock) of
+        {noop, Clock2} -> {noop, State#state{clock=Clock2}};
+        {tock, Tocked} ->
+            CallbackFun(Agg),
+            {emit, State#state{aggregate=AggMod:init(Seed), clock=Tocked}}
     end.

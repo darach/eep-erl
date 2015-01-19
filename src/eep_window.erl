@@ -20,33 +20,46 @@
 %% OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 %% USE OR OTHER DEALINGS IN THE SOFTWARE.
 %%
-%% File: eep_clock.erl. Defines clock implementation behaviour.
+%% File: eep_window.erl. Generic window-based functionality.
 %%
 %% -------------------------------------------------------------------
+-module(eep_window).
 
--module(eep_clock).
+-export([start/3]).
+-export([start/4]).
 
--include_lib("eep_erl.hrl").
+-export([loop/3]).
 
--export([tick/2]).
+start(Window, AggMod, Interval) ->
+    start(Window, AggMod, eep_clock_wall, Interval).
+start(Window, AggMod, ClockMod, Interval) ->
+    {ok, EventPid } = gen_event:start_link(),
+    CallbackFun = fun(NewAggregate) ->
+        gen_event:notify(
+            EventPid,
+            {emit, AggMod:emit(NewAggregate)}
+        )
+    end,
+    State = Window:new(AggMod, ClockMod, CallbackFun, Interval),
+    spawn(?MODULE, loop, [Window, EventPid, State]).
 
--callback name() ->
-    Name :: atom().
--callback at(ck_state()) ->
-    Now :: integer().
--callback new(Interval :: integer()) ->
-    ck_state().
--callback inc(Old :: ck_state()) ->
-    New :: ck_state().
--callback tick(Old :: ck_state()) ->
-    {Tocked :: boolean(), New :: ck_state()}.
--callback tock(Old :: ck_state()) ->
-    {Tocked :: boolean(), New :: ck_state()}.
-
-tick(CkMod, Clock) ->
-    case CkMod:tick(Clock) of
-        {false, UnTicked} -> {noop, UnTicked};
-        {true, Ticked} ->
-            {_, Tocked} = CkMod:tock(Ticked),
-            {tock, Tocked}
-    end.
+loop(Window, EventPid, State) ->
+  receive
+    tick ->
+      {_,NewState} = Window:tick(State),
+      loop(Window, EventPid, NewState);
+    { push, Event } ->
+      {_,NewState} = Window:push(State,Event),
+      loop(Window, EventPid, NewState);
+    { add_handler, Handler, Arr } ->
+      gen_event:add_handler(EventPid, Handler, Arr),
+      loop(Window, EventPid, State);
+    { delete_handler, Handler } ->
+      gen_event:delete_handler(EventPid, Handler, []),
+      loop(Window, EventPid, State);
+    stop ->
+      ok;
+    {debug, From} ->
+      From ! {debug, State},
+      loop(Window, EventPid, State)
+  end.

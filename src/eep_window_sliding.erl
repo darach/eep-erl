@@ -1,5 +1,5 @@
 %% -------------------------------------------------------------------
-%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com > 
+%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com >
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy of this software and associated documentation files (the
@@ -33,9 +33,6 @@
 -export([new/4]).
 -export([push/2]).
 
-%% private.
--export([loop/1]).
-
 -record(state, {
     size :: integer(),
     mod :: module(),
@@ -43,19 +40,19 @@
     aggregate :: any(),
     callback = undefined :: fun((...) -> any()),
     count = 1 :: integer(),
-    pid :: pid(),
     prior = [] :: list()
 }).
 
 start(Mod, Size) ->
   {ok, EventPid } = gen_event:start_link(),
-  CallbackFun = fun(NewAggregate) -> 
+  CallbackFun = fun(NewAggregate) ->
       gen_event:notify(
           EventPid,
           {emit, Mod:emit(NewAggregate)}
       )
   end,
-  spawn(?MODULE, loop, [#state{mod=Mod, seed=[], size=Size, pid=EventPid, count=1, aggregate=Mod:init(), callback=CallbackFun}]).
+  State = new(Mod, CallbackFun, Size),
+  spawn(eep_window, loop, [?MODULE, EventPid, State]).
 
 -spec new(Mod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
 new(Mod, CallbackFun, Size) ->
@@ -65,43 +62,23 @@ new(Mod, CallbackFun, Size) ->
 new(Mod, Seed, CallbackFun, Size) ->
     #state{size=Size, seed=Seed, mod=Mod, callback=CallbackFun, aggregate=Mod:init(Seed)}.
 
-
 push(State, Event) ->
     slide(State, Event).
 
--spec loop(State::#state{}) -> ok.
-loop(#state{pid=EventPid}=State) ->
-  receive
-    { push, Event } ->
-        {_,NewState} = slide(State,Event),
-        loop(NewState);
-    { add_handler, Handler, Arr } ->
-        gen_event:add_handler(EventPid, Handler, Arr),
-        loop(State);
-    { delete_handler, Handler } ->
-        gen_event:delete_handler(EventPid, Handler, []),
-        loop(State);
-    stop ->
-      ok;
-    {debug, From} ->
-      From ! {debug, State},
-      loop(State)
-  end.
-
 slide(#state{mod=Mod, size=Size, aggregate=Aggregate,count=Count,callback=CallbackFun,prior=Prior}=State,Event) ->
     NewAggregate = Mod:accumulate(Aggregate, Event),
-    if 
+    if
         Count < Size ->
             NewPrior = Prior ++ [Event],
             {noop,State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
         Count == Size ->
             NewPrior = Prior ++ [Event],
-            CallbackFun(NewAggregate), 
-            {emit,State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
+            CallbackFun(NewAggregate),
+            {emit, State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
         true ->
-            Value = lists:nth(1,Prior),
+            [Value | PriorTl] = Prior,
             NewAggregate2 = Mod:compensate(NewAggregate, Value),
-            CallbackFun(NewAggregate2), 
-            NewPrior = erlang:tl(Prior) ++ [Event],
+            CallbackFun(NewAggregate2),
+            NewPrior = PriorTl ++ [Event],
             {emit,State#state{aggregate=NewAggregate2,count=Count+1,prior=NewPrior}}
     end.
