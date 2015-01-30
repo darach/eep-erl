@@ -33,6 +33,7 @@
 -export([prop_monotonic_clock_count/0]).
 -export([prop_monotonic_sliding_window/0]).
 -export([prop_periodic_window/0]).
+-export([prop_tumbling_window/0]).
 -export([prop_sliding_window/0]).
 
 -define(epsilon, 1.0e-15).
@@ -69,6 +70,7 @@ prop_sum_aggregate_accum() ->
                       end, {0, eep_stats_sum:init()}, Ints),
                     RealSum == eep_stats_sum:emit(AggData)
             end).
+
 prop_monotonic_clock_count() ->
     ?FORALL({Interval, Events},
             {pos_integer(), list(tick)},

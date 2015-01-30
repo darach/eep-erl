@@ -47,6 +47,7 @@
 -export([t_monotonic_clock_count/1]).
 -export([t_monotonic_sliding_window/1]).
 -export([t_periodic_window/1]).
+-export([t_tumbling_window/1]).
 -export([t_sliding_window/1]).
 
 -include("eep_erl.hrl").
@@ -100,6 +101,7 @@ groups() ->
             t_monotonic_clock_count,
             t_monotonic_sliding_window,
             t_periodic_window,
+            t_tumbling_window,
             t_sliding_window
             ]}
     ].
@@ -347,6 +349,9 @@ t_monotonic_clock_count(_) ->
 
 t_periodic_window(_) ->
     ?proptest(prop_eep:prop_periodic_window()).
+
+t_tumbling_window(_) ->
+    ?proptest(prop_eep:prop_tumbling_window()).
 
 t_sliding_window(_) ->
     ?proptest(prop_eep:prop_sliding_window()).
