@@ -1,5 +1,5 @@
 %% -------------------------------------------------------------------
-%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com > 
+%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com >
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy of this software and associated documentation files (the
@@ -33,66 +33,88 @@
 -export([tumbling/5]).
 -export([sliding/5]).
 -export([push/2]).
+-export([tick/1]).
 
--record(win,
-        {
-         type :: tumbling | sliding,
-         by :: events | ticks,
-         compensating :: boolean(),
-         size :: pos_integer(),
-         aggmod :: module(),
-         agg :: any(),
-         seed = [] :: list(),
-         count = 1,
-         events = []
-        }).
+-include("eep_erl.hrl").
 
 %% Pure window functionality.
 
 %% Window type creation functions.
 %% TODO More window types/options to follow.
+tumbling(Clock, clock, Size, Aggregate, Seed) ->
+    #eep_win{type=tumbling, by=time, compensating=false,
+         size=Size, aggmod=Aggregate, agg=(Aggregate:init(Seed)),
+            clockmod=Clock, clock=(Clock:new(Size))};
 tumbling(none, events, Size, Aggregate, Seed) ->
-    #win{type=tumbling, by=events, compensating=false,
-         size=Size, aggmod=Aggregate, agg=(Aggregate:init(Seed))}.
+    #eep_win{type=tumbling, by=events, compensating=false,
+             size=Size, aggmod=Aggregate, agg=(Aggregate:init(Seed))}.
 
+sliding(Clock, clock, Size, Aggregate, Seed) ->
+    #eep_win{type=sliding, by=time, compensating=true,
+         size=Size, aggmod=Aggregate, agg=(Aggregate:init(Seed)),
+         clockmod=Clock, clock=(Clock:new(Size))};
+%% TODO This might need refactoring to give a more consistent control surface
 sliding(none, events, Size, Aggregate, Seed) ->
-    #win{type=sliding, by=events, compensating=true,
+    #eep_win{type=sliding, by=events, compensating=true,
          size=Size, aggmod=Aggregate, agg=(Aggregate:init(Seed))}.
 
 %% Window command interface.
-push(Event, #win{type=sliding, by=events}=Win) ->
-    #win{count=Count, size=Size} = Win,
+push(Event, #eep_win{type=sliding, by=time}=Win) ->
+    decide([accumulate], Event, Win);
+push(Event, #eep_win{type=sliding, by=events}=Win) ->
+    #eep_win{count=Count, size=Size} = Win,
     Actions = slide(Count, Size),
     decide(Actions, Event, Win);
-push(Event, #win{type=tumbling, by=events}=Win) ->
-    #win{count=Count, size=Size} = Win,
+push(Event, #eep_win{type=tumbling, by=time}=Win) ->
+    Actions = [accumulate], % TODO Work this into tumble/2 below
+    decide(Actions, Event, Win);
+push(Event, #eep_win{type=tumbling, by=events}=Win) ->
+    #eep_win{count=Count, size=Size} = Win,
     Actions = tumble(Count, Size),
     decide(Actions, Event, Win).
 
+tick(#eep_win{by=time}=Win) ->
+    #eep_win{compensating=Comps, clockmod=CkMod, clock=Clock} = Win,
+    case eep_clock:tick(CkMod, Clock) of
+        {noop, UnTicked} -> {noop, Win#eep_win{clock=UnTicked}};
+        {tock, Tocked} ->
+            Action =
+                if Comps -> [emit, compensate];
+                   true -> [emit, reset]
+                end,
+            decide(Action, noop, Win#eep_win{clock=Tocked})
+    end;
+tick(#eep_win{}=_in) ->
+    error({how, can, you, tick, that, which, is, untickable}).
+
 %% Window behaviour functions: given the current relevant state of a window,
 %% pick what action(s) are next.
+%% TODO Most of this logic could be covered by using a monotonic clock and the
+%% tick/tock mechanism on push instead.
 tumble(Count, Size) when Count  < Size -> [accumulate];
 tumble(Count, Size) when Count >= Size -> [accumulate, emit, reset].
 
 slide(Count, Size) when Count  < Size -> [accumulate];
 slide(Count, Size) when Count == Size -> [accumulate, emit];
-slide(Count, Size) when Count  > Size -> [accumulate, compensate, emit].
+slide(Count, Size) when Count  > Size -> [compensate, accumulate, emit].
 
 %% Window internal mechanisms: these correspond to the actions decided upon
 %% by the behaviour functions above.
-accumulate(Event, #win{aggmod=AMod, agg=Agg, count=Count}=Win) ->
-    Accumed = Win#win{agg=(AMod:accumulate(Agg, Event)), count=Count+1},
-    if Win#win.compensating -> %% If we're to compensate we must store the events
-           Accumed#win{events= Win#win.events++[Event]};
+accumulate(Event, #eep_win{aggmod=AMod, agg=Agg, count=Count}=Win) ->
+    Accumed = Win#eep_win{agg=(AMod:accumulate(Agg, Event)), count=Count+1},
+    if Win#eep_win.compensating -> %% If we're to compensate we must store the events
+           Accumed#eep_win{events= Win#eep_win.events++[Event]};
        true ->
            Accumed
     end.
 
-compensate(#win{aggmod=AMod, agg=Agg, events=[Oldest|Es]}=Win) ->
-    Win#win{agg=(AMod:compensate(Agg, Oldest)), events=Es}.
+compensate(#eep_win{events=[]}=Win) -> %% No events, no compensation.
+    Win;
+compensate(#eep_win{aggmod=AMod, agg=Agg, events=[Oldest|Es]}=Win) ->
+    Win#eep_win{agg=(AMod:compensate(Agg, Oldest)), events=Es}.
 
-reset(#win{aggmod=AMod, seed=Seed}=Win) ->
-    Win#win{agg=(AMod:init(Seed)), count=1}.
+reset(#eep_win{aggmod=AMod, seed=Seed}=Win) ->
+    Win#eep_win{agg=(AMod:init(Seed)), count=1}.
 
 %% Given a list of actions (from the behaviour functions above), an event and
 %% the current window state, apply the actions in order and return the result.
@@ -109,7 +131,7 @@ decide([reset|Actions], Event, Window, Decision) ->
     decide(Actions, Event, reset(Window), Decision);
 decide([emit|Actions], Event, Window, noop) ->
     %% TODO This enforces only one emission per decision: is this right?
-    decide(Actions, Event, Window, {emit, Window#win.agg}).
+    decide(Actions, Event, Window, {emit, Window#eep_win.agg}).
 
 %% Process functionality: utils for running windows as a process.
 start(Window, AggMod, Interval) ->

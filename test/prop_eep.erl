@@ -35,6 +35,7 @@
 -export([prop_periodic_window/0]).
 -export([prop_tumbling_window/0]).
 -export([prop_sliding_window/0]).
+-export([prop_sliding_time_window/0]).
 
 -define(epsilon, 1.0e-15).
 
@@ -199,3 +200,20 @@ expected(WinSize, Integers, SoFar)
 expected(WinSize, Integers, SoFar) ->
     Window = lists:sublist(Integers, 1, WinSize),
     expected(WinSize, lists:nthtail(WinSize, Integers), [lists:sum(Window) | SoFar]).
+
+time_slider({push, E}, {W, As}) ->
+    {A, W1} = eep_window:push(E, W),
+    {W1, [A | As]};
+time_slider(tick, {W, As}) ->
+    {A, W1} = eep_window:tick(W),
+    {W1, [A | As]}.
+
+prop_sliding_time_window() ->
+    ?FORALL({Length, Events}, {1, [{push, 1}, tick, tick]},
+            begin
+                W0 = eep_window:sliding(eep_clock_count, clock, Length, eep_stats_count, []),
+                {_Wn, As} = lists:foldl(fun time_slider/2, {W0, []}, Events),
+                Actions = lists:reverse(As),
+                [noop, {emit, 1}, {emit, 0}] == Actions
+            end).
+

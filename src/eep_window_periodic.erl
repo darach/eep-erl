@@ -58,25 +58,25 @@ new(AggMod, CallbackFun, Interval) ->
 new(AggMod, ClockMod, CallbackFun, Interval) ->
     new(AggMod, ClockMod, [], CallbackFun, Interval).
 
--spec new(AggMod::module(), ClockMod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
+-spec new(AggMod::module(),
+          ClockMod::module(),
+          Seed::list(),
+          CallbackFun,
+          Integer::integer()) ->
+    {CallbackFun, #eep_win{}}
+      when CallbackFun :: fun((...) -> any()).
 new(AggMod, ClockMod, Seed, CallbackFun, Interval) ->
-    Clock = ClockMod:new(Interval),
-    #state{agg_mod=AggMod, aggregate=AggMod:init(Seed), seed=Seed,
-           clock_mod=ClockMod, clock=Clock, interval=Interval,
-           callback=CallbackFun}.
+    {CallbackFun, eep_window:tumbling(ClockMod, clock, Interval, AggMod, Seed)}.
 
--spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
-push(State, Event) ->
-    accum(State, Event).
+-spec push(#eep_win{}, any()) -> {noop,#eep_win{}}.
+push({CBFun, Window}, Event) ->
+    {noop, Pushed} = eep_window:push(Event, Window),
+    {noop, {CBFun, Pushed}}.
 
-accum(#state{agg_mod=AggMod, aggregate=Agg}=State,Event) ->
-    {noop, State#state{ aggregate=AggMod:accumulate(Agg, Event) }}.
-
-tick(#state{callback=CallbackFun, agg_mod=AggMod, aggregate=Agg, seed=Seed,
-            clock_mod=CkMod, clock=Clock}=State) ->
-    case eep_clock:tick(CkMod, Clock) of
-        {noop, Clock2} -> {noop, State#state{clock=Clock2}};
-        {tock, Tocked} ->
-            CallbackFun(Agg),
-            {emit, State#state{aggregate=AggMod:init(Seed), clock=Tocked}}
+tick({CBFun, Window}) ->
+    case eep_window:tick(Window) of
+        {noop, Next} -> {noop, {CBFun, Next}};
+        {{emit, Emission}, Next} ->
+            CBFun(Emission),
+            {emit, {CBFun, Next}}
     end.

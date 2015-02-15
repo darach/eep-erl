@@ -142,21 +142,28 @@ t_clock_count(_Config) ->
 
 t_win_tumbling_inline(_Config) ->
     W0  = eep_window_tumbling:new(eep_stats_count, fun(_Callback) -> boop end, 2),
-    {_Fun, {win, tumbling, events, false, 2, eep_stats_count, 0, [], 1, []}} = W0,
+    {_Fun, #eep_win{
+              type=tumbling,
+              by=events,
+              compensating=false,
+              aggmod=eep_stats_count,
+              agg=0,
+              count=1
+             }} = W0,
     {noop,W1} = eep_window_tumbling:push(W0,foo),
     {emit,W2} = eep_window_tumbling:push(W1,bar),
     {noop,W3} = eep_window_tumbling:push(W2,baz),
     {emit,W4} = eep_window_tumbling:push(W3,bar),
-    {_Fun, {win, tumbling, events, false, 2, eep_stats_count, 0, [], 1, []}} = W4,
+    {_Fun, #eep_win{ agg=0, count=1 }} = W4,
     {noop,W5} = eep_window_tumbling:push(W4,foo),
-    {_Fun, {win, tumbling, events, false, 2, eep_stats_count, 1, [], 2, []}} = W5,
+    {_Fun, #eep_win{ agg=1, count=2 }} = W5,
     {emit,W6} = eep_window_tumbling:push(W5,bar),
     {noop,W7} = eep_window_tumbling:push(W6,foo),
     {emit,W8} = eep_window_tumbling:push(W7,bar),
+    {_Fun, #eep_win{ agg=0, count=1 }} = W8,
     {noop,W9} = eep_window_tumbling:push(W8,foo),
-    {_Fun, {win, tumbling, events, false, 2, eep_stats_count, 0, [], 1, []}} = W8,
     {emit,W10} = eep_window_tumbling:push(W9,bar),
-    {_Fun, {win, tumbling, events, false, 2, eep_stats_count, 0, [], 1, []}} = W10,
+    {_Fun, #eep_win{ agg=0, count=1 }} = W10,
     ok.
 
 t_win_tumbling_process(_Config) ->
@@ -164,15 +171,22 @@ t_win_tumbling_process(_Config) ->
     Pid ! {push, foo},
     Pid ! {push, bar},
     Pid ! {debug, self()},
-    receive
+    {_, BaseWin} = receive
 	    { debug, Debug0 } -> 
-            {_, {win, tumbling, events, false, 2, eep_stats_count, 0, [], 1, []}} = Debug0
+            {_, #eep_win{type=tumbling,
+                         by=events,
+                         compensating=false,
+                         size=2,
+                         aggmod=eep_stats_count,
+                         agg=0,
+                         count=1}} = Debug0
     end,
     Pid ! {push, baz},
     Pid ! {debug, self()},
+    ExpWin1 = BaseWin#eep_win{agg=1, count=2},
     receive
 	    { debug, Debug1 } ->
-            {_, {win, tumbling, events, false, 2, eep_stats_count, 1, [], 2, []}} = Debug1
+            {_, ExpWin1} = Debug1
     end,
     Pid ! {push, foo},
     Pid ! {push, bar},
@@ -183,12 +197,12 @@ t_win_tumbling_process(_Config) ->
     Pid ! {debug, self()},
     receive
 	    { debug, Debug2 } ->
-            {_, {win, tumbling, events, false, 2, eep_stats_count, 1, [], 2, []}} = Debug2
+            {_, #eep_win{agg=1, count=2}} = Debug2
     end,
     Pid ! {debug, self()},
     receive
 	    { debug, Debug3 } ->
-            {_, {win, tumbling, events, false, 2, eep_stats_count, 1, [], 2, []}} = Debug3
+            {_, #eep_win{agg=1, count=2}} = Debug3
     end,
     Pid ! stop.
 
@@ -237,12 +251,24 @@ t_win_sliding_process(_Config) ->
     Pid ! stop.
 
 t_win_periodic_inline(_Config) ->
-    W0 = eep_window_periodic:new(eep_stats_count, fun(_) -> boop end, 0),
+    W0 = eep_window_periodic:new(eep_stats_count, eep_clock_count, fun(_) -> boop end, 1),
+    {_Fun, E0} = W0,
+    #eep_win{
+       type=tumbling,
+       by=time,
+       compensating=false,
+       clockmod=eep_clock_count,
+       clock=#eep_clock{at=0, mark=0, interval=1},
+       aggmod=eep_stats_count,
+       agg=0,
+       count=1 } = E0,
     {noop,W1} = eep_window_periodic:push(W0,foo),
     {noop,W2} = eep_window_periodic:push(W1,bar),
-    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},2,_} = W2,
+    E1 = E0#eep_win{agg=2, count=3, clock=#eep_clock{at=0, mark=0, interval=1}},
+    {_Fun, E1} = W2,
     {emit,W3} = eep_window_periodic:tick(W2),
-    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_} = W3,
+    E2 = E1#eep_win{agg=0, count=1, clock=#eep_clock{at=1, mark=1, interval=1}},
+    {_Fun, E2} = W3,
     {noop,W4} = eep_window_periodic:push(W3,foo),
     {noop,W5} = eep_window_periodic:push(W4,bar),
     {noop,W6} = eep_window_periodic:push(W5,foo),
@@ -250,21 +276,37 @@ t_win_periodic_inline(_Config) ->
     {noop,W8} = eep_window_periodic:push(W7,foo),
     {noop,W9} = eep_window_periodic:push(W8,bar),
     {emit,W10} = eep_window_periodic:tick(W9),
-    {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_} = W10,
+    E3 = E2#eep_win{agg=0, count=1, clock=#eep_clock{at=2, mark=2, interval=1}},
+    {_Fun, E3} = W10,
     ok.
 
 t_win_periodic_process(_Config) ->
-  Pid = eep_window_periodic:start(eep_stats_count, 0),
+  Pid = eep_window_periodic:start(eep_stats_count, eep_clock_count, 1),
   Pid ! {push, foo},
   Pid ! {push, bar},
   Pid ! {debug, self()},
+  E0 = #eep_win{
+          type=tumbling,
+          by=time,
+          compensating=false,
+          clockmod=eep_clock_count,
+          clock=#eep_clock{at=0, mark=0, interval=1},
+          aggmod=eep_stats_count,
+          agg=2,
+          size=1,
+          count=3 },
   receive
-    { debug, Debug0 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},2,_} = Debug0
+    { debug, Debug0 } ->
+          {_, E0} = Debug0
+          %{state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},2,_} = Debug0
   end,
   Pid ! tick,
   Pid ! {debug, self()},
+  E1 = E0#eep_win{agg=0, count=1, clock=#eep_clock{at=1, mark=1}},
   receive
-    { debug, Debug1 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_} = Debug1
+    { debug, Debug1 } ->
+          {_, E1} = Debug1
+          %{state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_} = Debug1
   end,
   Pid ! {push, foo},
   Pid ! {push, bar},
@@ -273,13 +315,19 @@ t_win_periodic_process(_Config) ->
   Pid ! {push, foo},
   Pid ! {push, bar},
   Pid ! {debug, self()},
+  E2 = E1#eep_win{count=7, agg=6},
   receive
-    { debug, Debug2 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},6,_} = Debug2
+    { debug, Debug2 } ->
+          {_, E2} = Debug2
+          %{state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},6,_} = Debug2
   end,
   Pid ! tick,
   Pid ! {debug, self()},
+  E3 = E2#eep_win{count=1, agg=0, clock=#eep_clock{at=2, mark=2}},
   receive
-    { debug, Debug3 } -> {state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_} = Debug3
+    { debug, Debug3 } ->
+          {_, E3} = Debug3
+          %{state,0,eep_stats_count,eep_clock_wall,[],{eep_clock,_,_,0},0,_} = Debug3
   end,
   Pid ! stop.
 
