@@ -56,29 +56,17 @@ start(Mod, Size) ->
 
 -spec new(Mod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
 new(Mod, CallbackFun, Size) ->
-    #state{size=Size, mod=Mod, callback=CallbackFun, aggregate=Mod:init()}.
+    {CallbackFun, eep_window:sliding(none, events, Size, Mod, [])}.
 
 -spec new(Mod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
 new(Mod, Seed, CallbackFun, Size) ->
-    #state{size=Size, seed=Seed, mod=Mod, callback=CallbackFun, aggregate=Mod:init(Seed)}.
+    {CallbackFun, eep_window:sliding(none, events, Size, Mod, Seed)}.
 
-push(State, Event) ->
-    slide(State, Event).
-
-slide(#state{mod=Mod, size=Size, aggregate=Aggregate,count=Count,callback=CallbackFun,prior=Prior}=State,Event) ->
-    NewAggregate = Mod:accumulate(Aggregate, Event),
-    if
-        Count < Size ->
-            NewPrior = Prior ++ [Event],
-            {noop,State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
-        Count == Size ->
-            NewPrior = Prior ++ [Event],
-            CallbackFun(NewAggregate),
-            {emit, State#state{aggregate=NewAggregate,count=Count+1,prior=NewPrior}};
-        true ->
-            [Value | PriorTl] = Prior,
-            NewAggregate2 = Mod:compensate(NewAggregate, Value),
-            CallbackFun(NewAggregate2),
-            NewPrior = PriorTl ++ [Event],
-            {emit,State#state{aggregate=NewAggregate2,count=Count+1,prior=NewPrior}}
+push({CBFun, Win}, Event) ->
+    case eep_window:push(Event, Win) of
+        {noop, Pushed} ->
+            {noop, {CBFun, Pushed}};
+        {{emit, Emission}, Pushed} ->
+            CBFun(Emission),
+            {emit, {CBFun, Pushed}}
     end.
