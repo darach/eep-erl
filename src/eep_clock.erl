@@ -43,6 +43,9 @@
 -callback tock(Old :: ck_state()) ->
     {Tocked :: boolean(), New :: ck_state()}.
 
+-spec tick(module(), Curr :: ck_state()) ->
+    {noop, UnTicked :: ck_state()}
+    | {tock, Tocked :: ck_state()}.
 tick(CkMod, Clock) ->
     case CkMod:tick(Clock) of
         {false, UnTicked} -> {noop, UnTicked};
