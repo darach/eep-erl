@@ -30,8 +30,8 @@
 
 -export([loop/3]).
 
--export([tumbling/5]).
--export([sliding/5]).
+-export([tumbling/4]).
+-export([sliding/4]).
 -export([push/2]).
 -export([tick/1]).
 
@@ -41,21 +41,21 @@
 
 %% Window type creation functions.
 %% TODO More window types/options to follow.
-tumbling(Clock, clock, Size, Aggregate, Seed) ->
+tumbling({clock, Clock}, Size, Aggregate, Seed) ->
     #eep_win{type=tumbling, by=time, compensating=false,
          size=Size, clockmod=Clock, clock=(Clock:new(Size)),
          seed=Seed, aggmod=Aggregate, agg=(Aggregate:init(Seed))};
-tumbling(none, events, Size, Aggregate, Seed) ->
+tumbling(events, Size, Aggregate, Seed) ->
     #eep_win{type=tumbling, by=events, compensating=false,
              size=Size, seed=Seed,
              aggmod=Aggregate, agg=(Aggregate:init(Seed))}.
 
-sliding(Clock, clock, Size, Aggregate, Seed) ->
+sliding({clock, Clock}, Size, Aggregate, Seed) ->
     #eep_win{type=sliding, by=time, compensating=true,
          size=Size, clockmod=Clock, clock=(Clock:new(Size)),
          seed=Seed, aggmod=Aggregate, agg=(Aggregate:init(Seed))};
 %% TODO This might need refactoring to give a more consistent control surface
-sliding(none, events, Size, Aggregate, Seed) ->
+sliding(events, Size, Aggregate, Seed) ->
     #eep_win{type=sliding, by=events, compensating=true,
          size=Size, seed=Seed,
          aggmod=Aggregate, agg=(Aggregate:init(Seed))}.
