@@ -43,20 +43,22 @@
 %% TODO More window types/options to follow.
 tumbling(Clock, clock, Size, Aggregate, Seed) ->
     #eep_win{type=tumbling, by=time, compensating=false,
-         size=Size, aggmod=Aggregate, agg=(Aggregate:init(Seed)),
-            clockmod=Clock, clock=(Clock:new(Size))};
+         size=Size, clockmod=Clock, clock=(Clock:new(Size)),
+         seed=Seed, aggmod=Aggregate, agg=(Aggregate:init(Seed))};
 tumbling(none, events, Size, Aggregate, Seed) ->
     #eep_win{type=tumbling, by=events, compensating=false,
-             size=Size, aggmod=Aggregate, agg=(Aggregate:init(Seed))}.
+             size=Size, seed=Seed,
+             aggmod=Aggregate, agg=(Aggregate:init(Seed))}.
 
 sliding(Clock, clock, Size, Aggregate, Seed) ->
     #eep_win{type=sliding, by=time, compensating=true,
-         size=Size, aggmod=Aggregate, agg=(Aggregate:init(Seed)),
-         clockmod=Clock, clock=(Clock:new(Size))};
+         size=Size, clockmod=Clock, clock=(Clock:new(Size)),
+         seed=Seed, aggmod=Aggregate, agg=(Aggregate:init(Seed))};
 %% TODO This might need refactoring to give a more consistent control surface
 sliding(none, events, Size, Aggregate, Seed) ->
     #eep_win{type=sliding, by=events, compensating=true,
-         size=Size, aggmod=Aggregate, agg=(Aggregate:init(Seed))}.
+         size=Size, seed=Seed,
+         aggmod=Aggregate, agg=(Aggregate:init(Seed))}.
 
 %% Window command interface.
 push(Event, #eep_win{type=sliding, by=time}=Win) ->
