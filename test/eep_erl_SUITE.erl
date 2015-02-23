@@ -49,6 +49,7 @@
 -export([t_periodic_window/1]).
 -export([t_tumbling_window/1]).
 -export([t_sliding_window/1]).
+-export([t_sliding_time_window/1]).
 
 -include("eep_erl.hrl").
 -include_lib("common_test/include/ct.hrl").
@@ -102,7 +103,8 @@ groups() ->
             t_monotonic_sliding_window,
             t_periodic_window,
             t_tumbling_window,
-            t_sliding_window
+            t_sliding_window,
+            t_sliding_time_window
             ]}
     ].
 
@@ -148,6 +150,7 @@ t_win_tumbling_inline(_Config) ->
               compensating=false,
               aggmod=eep_stats_count,
               agg=0,
+              clockmod=_,clock=_,
               count=1
              }} = W0,
     {noop,W1} = eep_window_tumbling:push(W0,foo),
@@ -171,22 +174,26 @@ t_win_tumbling_process(_Config) ->
     Pid ! {push, foo},
     Pid ! {push, bar},
     Pid ! {debug, self()},
-    {_, BaseWin} = receive
-	    { debug, Debug0 } -> 
-            {_, #eep_win{type=tumbling,
-                         by=events,
-                         compensating=false,
-                         size=2,
-                         aggmod=eep_stats_count,
-                         agg=0,
-                         count=1}} = Debug0
+    receive
+        {debug, {_, #eep_win{
+                       type=tumbling, by=events,
+                       compensating=false,
+                       size=2, count=1,
+                       aggmod=eep_stats_count, agg=0
+                      }}}=Debug0 ->
+            Debug0;
+        {debug, {_, #eep_win{}=Unex}} ->
+            ct:fail({badmatch, Unex});
+        Unexp -> ct:fail({unexpected, Unexp})
     end,
     Pid ! {push, baz},
     Pid ! {debug, self()},
-    ExpWin1 = BaseWin#eep_win{agg=1, count=2},
     receive
-	    { debug, Debug1 } ->
-            {_, ExpWin1} = Debug1
+        {debug, {_, #eep_win{agg=1, count=2}}}=Debug1 ->
+            Debug1;
+	    {debug, {_, #eep_win{}=Win}} ->
+            ct:fail({badmatch, Win});
+        Unexp2 -> ct:fail({unexpected, Unexp2})
     end,
     Pid ! {push, foo},
     Pid ! {push, bar},
@@ -196,57 +203,76 @@ t_win_tumbling_process(_Config) ->
     Pid ! {push, bar},
     Pid ! {debug, self()},
     receive
-	    { debug, Debug2 } ->
-            {_, #eep_win{agg=1, count=2}} = Debug2
+        {debug, {_, #eep_win{agg=1, count=2}}}=Debug2 ->
+            Debug2;
+	    {debug, {_, #eep_win{}=Win2}} ->
+            ct:fail({badmatch, Win2});
+        Unexp3 ->
+            ct:fail({unexpected, Unexp3})
     end,
     Pid ! {debug, self()},
     receive
-	    { debug, Debug3 } ->
-            {_, #eep_win{agg=1, count=2}} = Debug3
+        {debug, {_, #eep_win{agg=1, count=2}}}=Debug3 ->
+            Debug3;
+        {debug, {_, #eep_win{}=Win3}} ->
+            ct:fail({badmatch, Win3});
+        Unexp4 ->
+            ct:fail({unexpected, Unexp4})
     end,
     Pid ! stop.
 
 t_win_sliding_inline(_Config) ->
     W0 = eep_window_sliding:new(eep_stats_count, fun(_) -> boop end, 2),
-    E0 = #eep_win{
-            by=events, type=sliding,
-            compensating=true, size=2,
-            aggmod=eep_stats_count, agg=0},
+    case W0 of
+        {_, #eep_win{by=events, type=sliding,
+                compensating=true, size=2,
+                aggmod=eep_stats_count, agg=0}} -> ok;
+        {_, #eep_win{}} -> ct:fail({badmatch, W0})
+    end,
     {noop,W1} = eep_window_sliding:push(W0,foo),
     {emit,W2} = eep_window_sliding:push(W1,bar),
-    E2 = E0#eep_win{agg=2, count=3, events=[foo, bar]},
-    {_, E2} = W2,
+    case W2 of
+        {_, #eep_win{agg=1, count=3}} -> ok;
+        {_, #eep_win{}} -> ct:fail({badmatch, W2})
+    end,
     {emit,W3} = eep_window_sliding:push(W2,baz),
-    E3 = E2#eep_win{count=4, agg=2, events=[bar, baz]},
-    {_, E3} = W3,
-    %{state,2,eep_stats_count,[],2,_,4,[bar,baz]} = W3,
+
+    case W3 of
+        {_, #eep_win{count=4, agg=1}} -> ok;
+        {_, #eep_win{}} -> ct:fail({badmatch, W3})
+    end,
     {emit,W4} = eep_window_sliding:push(W3,foo),
     {emit,W5} = eep_window_sliding:push(W4,bar),
     {emit,W6} = eep_window_sliding:push(W5,foo),
     {emit,W7} = eep_window_sliding:push(W6,bar),
     {emit,W8} = eep_window_sliding:push(W7,foo),
     {emit,W9} = eep_window_sliding:push(W8,bar),
-    E9 = E3#eep_win{events=[foo, bar], agg=2, count=10},
-    {_, E9} = W9.
+    case W9 of
+        {_, #eep_win{agg=1, count=10}} -> ok;
+        {_, #eep_win{}} -> ct:fail({badmatch, W9})
+    end.
 
 t_win_sliding_process(_Config) ->
     Pid = eep_window_sliding:start(eep_stats_count, 2),
     Pid ! {push, foo},
     Pid ! {push, bar},
     Pid ! {debug, self()},
-    E0 = #eep_win{
-           by=events, type=sliding,
-           compensating=true, size=2,
-           aggmod=eep_stats_count, agg=2,
-           events=[foo, bar], count=3},
     receive
-        { debug, Debug0 } -> {_, E0} = Debug0
+        {debug, {_, #eep_win{
+                       by=events, type=sliding,
+                       compensating=true, size=2,
+                       aggmod=eep_stats_count, agg=1,
+                       count=3
+                      }}}=Debug0 -> Debug0;
+        {debug, {_, #eep_win{}=Win0}} -> ct:fail({badmatch, Win0});
+        Unexp0 -> ct:fail({unexpected, Unexp0})
     end,
     Pid ! {push, baz},
     Pid ! {debug, self()},
-    E1 = E0#eep_win{events=[bar, baz], count=4},
     receive
-        { debug, Debug1 } -> {_, E1} = Debug1
+        {debug, {_, #eep_win{agg=1, count=4}}}=Debug1 -> Debug1;
+        {debug, {_, #eep_win{}=Win1}} -> ct:fail({badmatch, Win1});
+        Unexp1 -> ct:fail({unexpected, Unexp1})
     end,
     Pid ! {push, foo},
     Pid ! {push, bar},
@@ -255,13 +281,16 @@ t_win_sliding_process(_Config) ->
     Pid ! {push, foo},
     Pid ! {push, bar},
     Pid ! {debug, self()},
-    E2 = E1#eep_win{events=[foo, bar], count=10},
     receive
-        { debug, Debug2 } -> {_, E2} = Debug2
+        {debug, {_, #eep_win{agg=1, count=10}}}=Debug2 -> Debug2;
+        {debug, {_, #eep_win{}=Win2}} -> ct:fail({badmatch, Win2});
+        Unexp2 -> ct:fail({unexpected, Unexp2})
     end,
     Pid ! {debug, self()},
     receive
-        { debug, Debug3 } -> {_, E2} = Debug3
+        {debug, {_, #eep_win{agg=1, count=10}}}=Debug3 -> Debug3;
+        {debug, {_, #eep_win{}=Win3}} -> ct:fail({badmatch, Win3});
+        Unexp3 -> ct:fail({unexpected, Unexp3})
     end,
     Pid ! stop.
 
@@ -421,3 +450,6 @@ t_sliding_window(_) ->
 
 t_monotonic_sliding_window(_) ->
     ?proptest(prop_eep:prop_monotonic_sliding_window()).
+
+t_sliding_time_window(_) ->
+    ?proptest(prop_eep:prop_sliding_time_window()).

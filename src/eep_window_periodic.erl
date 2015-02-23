@@ -66,7 +66,7 @@ new(AggMod, ClockMod, CallbackFun, Interval) ->
     {CallbackFun, #eep_win{}}
       when CallbackFun :: fun((...) -> any()).
 new(AggMod, ClockMod, Seed, CallbackFun, Interval) ->
-    {CallbackFun, eep_window:tumbling({clock, ClockMod}, Interval, AggMod, Seed)}.
+    {CallbackFun, eep_window:tumbling({clock, ClockMod, Interval}, Interval, AggMod, Seed)}.
 
 -spec push(#eep_win{}, any()) -> {noop,#eep_win{}}.
 push({CBFun, Window}, Event) ->

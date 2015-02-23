@@ -45,7 +45,7 @@
          clock :: any(),
          seed = [] :: list(),
          count = 1,
-         events = []
+         log = eep_winlog:new() :: list(any())
         }).
 
 -type ck_state() :: #eep_clock{}.
