@@ -43,8 +43,6 @@
 -export([count_pushes/1]).
 -export([stride/2]).
 
--export([go/0]).
-
 -define(epsilon, 1.0e-15).
 
 prop_avg_aggregate_accum() ->
@@ -134,7 +132,7 @@ prop_monotonic_sliding_window() ->
                 Win = {eep_stats_sum:init(), Size, 1, [], none},
                 %% TODO Refactor eep_window_sliding so we can use it directly here
                 %% and not replicate its inner machinations below.
-                WinFinal = lists:foldl(fun slide/2, Win, Integers),
+                WinFinal = lists:foldl(fun slide_fold/2, Win, Integers),
                 {_, Size, _, _, Emission} = WinFinal,
                 if
                     % We expect no emission if the input list is less than our window size
@@ -149,8 +147,8 @@ prop_monotonic_sliding_window() ->
                 end
             end).
 
-%% NB This logic is copied directly from eep_window_sliding.erl
-slide(Int, {Agg, Size, Count, Prior, LastEmission}) ->
+%% NB This logic is copied directly from what was eep_window_sliding.erl
+slide_fold(Int, {Agg, Size, Count, Prior, LastEmission}) ->
     NewAgg = eep_stats_sum:accumulate(Agg, Int),
     if
         Count < Size ->
@@ -169,24 +167,33 @@ prop_tumbling_window() ->
     ?FORALL({Size, Integers}, {pos_integer(), non_empty(list(integer()))},
             begin
                 W0 = eep_window:tumbling(events, Size, eep_stats_sum, []),
-                {_Wn, As} = lists:foldl(fun winfold/2, {W0, []}, Integers),
+                {_Wn, As} = lists:foldl(fun push_folder/2, {W0, []}, Integers),
                 Emissions = [ eep_stats_sum:emit(A) || {emit,A} <- As],
                 Noops = [noop || noop <- As],
-                ExpEmissions = expected(Size, Integers),
+                ExpEmissions = tumbling_expected(Size, Integers),
                 %% Number of 'emit' should be length(Integers) div Size
                 length(Emissions) == length(Integers) div Size
                     %% The rest should have been noop
                     andalso length(Noops) == length(Integers) - length(Emissions)
                     %% The emitted values should match our expectation
-                    %% (see expected/2 below)
+                    %% (see tumbling_expected/2 below)
                     andalso Emissions == ExpEmissions
             end).
+
+tumbling_expected(WinSize, Integers) ->
+    lists:reverse(tumbling_expected(WinSize, Integers, [])).
+tumbling_expected(WinSize, Integers, SoFar)
+  when WinSize > length(Integers) ->
+    SoFar;
+tumbling_expected(WinSize, Integers, SoFar) ->
+    Window = lists:sublist(Integers, 1, WinSize),
+    tumbling_expected(WinSize, lists:nthtail(WinSize, Integers), [lists:sum(Window) | SoFar]).
 
 prop_sliding_window() ->
     ?FORALL({Size, Integers}, {pos_integer(), non_empty(list(integer()))},
             begin
                 W0 = eep_window:sliding(events, Size, eep_stats_count, []),
-                {_Wn, As} = lists:foldl(fun winfold/2, {W0, []}, Integers),
+                {_Wn, As} = lists:foldl(fun push_folder/2, {W0, []}, Integers),
                 %% Expected: we emit for every event, except before we reach Size
                 %% events;
                 ExpEmissions = lists:duplicate(max(0, length(Integers) - Size + 1), Size),
@@ -196,25 +203,9 @@ prop_sliding_window() ->
                     andalso length(Noops) =< Size - 1
             end).
 
-winfold(Ev, {Win, As}) ->
+push_folder(Ev, {Win, As}) ->
     {A, Win1} = eep_window:push(Ev, Win),
     {Win1, As++[A]}.
-
-expected(WinSize, Integers) ->
-    lists:reverse(expected(WinSize, Integers, [])).
-expected(WinSize, Integers, SoFar)
-  when WinSize > length(Integers) ->
-    SoFar;
-expected(WinSize, Integers, SoFar) ->
-    Window = lists:sublist(Integers, 1, WinSize),
-    expected(WinSize, lists:nthtail(WinSize, Integers), [lists:sum(Window) | SoFar]).
-
-time_slider(push, {W, As}) ->
-    {A, W1} = eep_window:push(1, W),
-    {W1, [A | As]};
-time_slider(tick, {W, As}) ->
-    {A, W1} = eep_window:tick(W),
-    {W1, [A | As]}.
 
 prop_sliding_time_window() ->
     ?FORALL({Length, Events}, {pos_integer(), list(oneof([tick, push]))},
@@ -229,6 +220,13 @@ sliding_time_window(Length, Events) ->
     W0 = eep_window:sliding({clock, eep_clock_count, Length}, Length, eep_stats_count, []),
     {_Wn, As} = lists:foldl(fun time_slider/2, {W0, []}, Events),
     lists:reverse(As).
+
+time_slider(push, {W, As}) ->
+    {A, W1} = eep_window:push(1, W),
+    {W1, [A | As]};
+time_slider(tick, {W, As}) ->
+    {A, W1} = eep_window:tick(W),
+    {W1, [A | As]}.
 
 %% e.g.
 %% Length = 2, Interval = 2
@@ -250,11 +248,3 @@ stride(Size, Events) ->
     Window = lists:sublist(Events, Size),
     Tail = lists:nthtail(Size, Events),
     [{emit, lists:sum(Window)} | stride(Size, Tail)].
-
-go() ->
-    case proper:counterexample(prop_sliding_time_window(), 1000) of
-        true -> true;
-        [{L, Es}] ->
-            [{exp, expected_time_slider(L, Es)},
-             {got, sliding_time_window(L, Es)}]
-    end.
