@@ -57,7 +57,8 @@ inc(State) ->
 
 tick(State) ->
   NewState = inc(State),
-  {(NewState#eep_clock.at - NewState#eep_clock.mark) >= 0, NewState}.
+  #eep_clock{at=At, mark=Mark, interval=Interval}=NewState,
+  {(At - Mark) >= Interval, NewState}.
 
 tock(State) ->
   Delta = State#eep_clock.at - State#eep_clock.mark,
