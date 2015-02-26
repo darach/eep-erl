@@ -56,11 +56,11 @@ start(Mod, Size) ->
 
 -spec new(Mod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
 new(Mod, CallbackFun, Size) ->
-    {CallbackFun, eep_window:sliding(events, Size, Mod, [])}.
+    {CallbackFun, eep_window:sliding(event, Size, Mod, [])}.
 
 -spec new(Mod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
 new(Mod, Seed, CallbackFun, Size) ->
-    {CallbackFun, eep_window:sliding(events, Size, Mod, Seed)}.
+    {CallbackFun, eep_window:sliding(event, Size, Mod, Seed)}.
 
 push({CBFun, Win}, Event) ->
     case eep_window:push(Event, Win) of

@@ -47,27 +47,27 @@ tumbling({clock, Clock, Interval}, Size, Aggregate, Seed) ->
     #eep_win{type=tumbling, by=time, compensating=false,
          size=Size, clockmod=Clock, clock=(Clock:new(Interval)),
          seed=Seed, aggmod=Aggregate, agg=(Aggregate:init(Seed))};
-tumbling(events, Size, Aggregate, Seed) ->
+tumbling(event, Size, Aggregate, Seed) ->
     W = tumbling({clock, eep_clock_count, Size}, Size, Aggregate, Seed),
-    W#eep_win{by=events}. %% TODO FIXME
+    W#eep_win{by=event}. %% TODO FIXME
 
 sliding({clock, Clock, Interval}, Size, Aggregate, Seed) ->
     #eep_win{type=sliding, by=time, compensating=true,
          size=Size, clockmod=Clock, clock=(Clock:new(Interval)),
          seed=Seed, aggmod=Aggregate, agg=(Aggregate:init(Seed))};
-sliding(events, Size, Aggregate, Seed) ->
+sliding(event, Size, Aggregate, Seed) ->
     W = sliding({clock, eep_clock_count, 1}, Size, Aggregate, Seed),
-    W#eep_win{by=events}. %% TODO FIXME
+    W#eep_win{by=event}. %% TODO FIXME
 
 %% Window command interface.
 push(Event, #eep_win{by=time}=Win) ->
     decide([accumulate], Event, Win);
-push(Event, #eep_win{by=events}=Win) ->
+push(Event, #eep_win{by=event}=Win) ->
     decide([accumulate, tick], Event, Win).
 
-%% A thin wrapper that allows to stop external parties ticking a by-events window.
+%% A thin wrapper that allows to stop external parties ticking a by-event window.
 %% TODO THis might be unnecessary.
-tick(#eep_win{by=events}) ->
+tick(#eep_win{by=event}) ->
     error({how,can,you,tick,that,which,is,untickable});
 tick(#eep_win{by=time, count=C}=Win) ->
     %% TODO FIXME This count increment doesn't feel right here.
