@@ -49,7 +49,7 @@ at(State) ->
 
 new(Interval) ->
   At = ts(),
-  Mark = At + Interval,
+  Mark = At,
   #eep_clock{at = At, interval = Interval, mark=Mark}.
 
 inc(State) -> 
