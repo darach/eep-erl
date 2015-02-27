@@ -36,6 +36,7 @@
 -export([prop_tumbling_window/0]).
 -export([prop_sliding_window/0]).
 -export([prop_sliding_time_window/0]).
+-export([prop_wall_clock/0]).
 
 -export([sliding_time_window/2]).
 -export([expected_time_slider/2]).
@@ -76,6 +77,25 @@ prop_sum_aggregate_accum() ->
                               {Sum+N, eep_stats_sum:accumulate(State, N)}
                       end, {0, eep_stats_sum:init()}, Ints),
                     RealSum == eep_stats_sum:emit(AggData)
+            end).
+
+prop_wall_clock() ->
+    ?FORALL({Period, TickIntervals}, {500, list(integer(50, 100))},
+            begin
+                F = fun(I, {Cn, Cs, Ds, Ts}) ->
+                        timer:sleep(I),
+                        case eep_clock:tick(eep_clock_wall, Cn) of
+                            {noop, Cn1} ->
+                                Drift = eep_clock_wall:at(Cn1) - (eep_clock_wall:at(Cn) + I),
+                                {Cn1, [Cn|Cs], [Drift|Ds], Ts};
+                            {tock, Cn2} ->
+                                Drift = eep_clock_wall:at(Cn2) - (eep_clock_wall:at(Cn) + I),
+                                {Cn2, [Cn|Cs], [Drift|Ds], Ts+1}
+                        end end,
+                {_Cfinal, _Clocks, Drifts, Tocks} =
+                    lists:foldl(F, {eep_clock_wall:new(Period), [], [], 0}, TickIntervals),
+                ExpectedTocks = (lists:sum(Drifts) + lists:sum(TickIntervals)) div Period,
+                ExpectedTocks == Tocks
             end).
 
 prop_monotonic_clock_count() ->
