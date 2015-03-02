@@ -146,7 +146,7 @@ t_win_tumbling_inline(_Config) ->
     W0  = eep_window_tumbling:new(eep_stats_count, fun(_Callback) -> boop end, 2),
     {_Fun, #eep_win{
               type=tumbling,
-              by=events,
+              by=event,
               compensating=false,
               aggmod=eep_stats_count,
               agg=0,
@@ -176,7 +176,7 @@ t_win_tumbling_process(_Config) ->
     Pid ! {debug, self()},
     receive
         {debug, {_, #eep_win{
-                       type=tumbling, by=events,
+                       type=tumbling, by=event,
                        compensating=false,
                        size=2, count=1,
                        aggmod=eep_stats_count, agg=0
@@ -224,7 +224,7 @@ t_win_tumbling_process(_Config) ->
 t_win_sliding_inline(_Config) ->
     W0 = eep_window_sliding:new(eep_stats_count, fun(_) -> boop end, 2),
     case W0 of
-        {_, #eep_win{by=events, type=sliding,
+        {_, #eep_win{by=event, type=sliding,
                 compensating=true, size=2,
                 aggmod=eep_stats_count, agg=0}} -> ok;
         {_, #eep_win{}} -> ct:fail({badmatch, W0})
@@ -259,7 +259,7 @@ t_win_sliding_process(_Config) ->
     Pid ! {debug, self()},
     receive
         {debug, {_, #eep_win{
-                       by=events, type=sliding,
+                       by=event, type=sliding,
                        compensating=true, size=2,
                        aggmod=eep_stats_count, agg=1,
                        count=3

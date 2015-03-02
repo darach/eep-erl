@@ -36,7 +36,7 @@
 -record(eep_win,
         {
          type :: tumbling | sliding,
-         by :: events | ticks,
+         by :: event | ticks,
          compensating :: boolean(),
          size :: pos_integer(),
          aggmod :: module(),

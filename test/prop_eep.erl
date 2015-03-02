@@ -186,7 +186,7 @@ slide_fold(Int, {Agg, Size, Count, Prior, LastEmission}) ->
 prop_tumbling_window() ->
     ?FORALL({Size, Integers}, {pos_integer(), non_empty(list(integer()))},
             begin
-                W0 = eep_window:tumbling(events, Size, eep_stats_sum, []),
+                W0 = eep_window:tumbling(event, Size, eep_stats_sum, []),
                 {_Wn, As} = lists:foldl(fun push_folder/2, {W0, []}, Integers),
                 Emissions = [ eep_stats_sum:emit(A) || {emit,A} <- As],
                 Noops = [noop || noop <- As],
@@ -212,7 +212,7 @@ tumbling_expected(WinSize, Integers, SoFar) ->
 prop_sliding_window() ->
     ?FORALL({Size, Integers}, {pos_integer(), non_empty(list(integer()))},
             begin
-                W0 = eep_window:sliding(events, Size, eep_stats_count, []),
+                W0 = eep_window:sliding(event, Size, eep_stats_count, []),
                 {_Wn, As} = lists:foldl(fun push_folder/2, {W0, []}, Integers),
                 %% Expected: we emit for every event, except before we reach Size
                 %% events;

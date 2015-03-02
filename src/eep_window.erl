@@ -121,19 +121,17 @@ decide(Actions, Event, Window) ->
     decide(Actions, Event, Window, noop).
 
 decide([], _, Window, Decision) -> {Decision, Window};
-decide([tick|Actions], Event, Window, Decision) ->
-    case tick_(Window) of
-        {[noop], TickedWin} -> decide(Actions, Event, TickedWin, Decision);
-        {MoreActions, TdWin} -> decide(MoreActions++Actions, Event, TdWin, Decision)
-    end;
-decide([accumulate|Actions], Event, Window, Decision) ->
+decide([ tick |Actions], Event, Window, Decision) ->
+    {MoreActions, TdWin} = tick_(Window),
+    decide(MoreActions++Actions, Event, TdWin, Decision);
+decide([ accumulate |Actions], Event, Window, Decision) ->
     decide(Actions, Event, accumulate(Event, Window), Decision);
-decide([compensate|Actions], Event, Window, Decision) ->
+decide([ compensate |Actions], Event, Window, Decision) ->
     decide(Actions, Event, compensate(Window), Decision);
-decide([emit|Actions], Event, #eep_win{count=C, size=S}=Window, noop)
+decide([ emit |Actions], Event, #eep_win{count=C, size=S}=Window, noop)
   when C =< S -> %% count < size -> skip emission
     decide(Actions, Event, Window, noop);
-decide([emit|Actions], Event, #eep_win{}=Window, noop) ->
+decide([ emit |Actions], Event, #eep_win{}=Window, noop) ->
     %% TODO This enforces only one emission per decision: is this right?
     decide([ compensate | Actions ], Event, Window, {emit, Window#eep_win.agg}).
 
