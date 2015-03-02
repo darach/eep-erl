@@ -66,11 +66,12 @@ push(Event, #eep_win{by=event}=Win) ->
     decide([accumulate, tick], Event, Win).
 
 %% A thin wrapper that allows to stop external parties ticking a by-event window.
-%% TODO THis might be unnecessary.
+%% TODO THis might be unnecessary - maybe we don't need to make this restriction?
 tick(#eep_win{by=event}) ->
     error({how,can,you,tick,that,which,is,untickable});
 tick(#eep_win{by=time, count=C}=Win) ->
-    %% TODO FIXME This count increment doesn't feel right here.
+    %% TODO FIXME This count increment doesn't feel right here - there must be
+    %% a more elegant solution!
     {Actions, TickedWin} = tick_(Win#eep_win{count=C+1}),
     decide(Actions, tick, TickedWin).
 
@@ -129,7 +130,7 @@ decide([ accumulate |Actions], Event, Window, Decision) ->
 decide([ compensate |Actions], Event, Window, Decision) ->
     decide(Actions, Event, compensate(Window), Decision);
 decide([ emit |Actions], Event, #eep_win{count=C, size=S}=Window, noop)
-  when C =< S -> %% count < size -> skip emission
+  when C =< S -> %% TODO FIXME count < size -> skip emission 
     decide(Actions, Event, Window, noop);
 decide([ emit |Actions], Event, #eep_win{}=Window, noop) ->
     %% TODO This enforces only one emission per decision: is this right?
