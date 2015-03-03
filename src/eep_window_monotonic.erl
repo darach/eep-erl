@@ -1,5 +1,5 @@
 %% -------------------------------------------------------------------
-%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com > 
+%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com >
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy of this software and associated documentation files (the
@@ -38,93 +38,45 @@
 -export([tick/1]).
 -export([push/2]).
 
--export([loop/1]).
-
 -record(state, {
     interval :: integer(),
-    mod :: module(),
+    agg_mod :: module(),
     seed = [] :: list(),
     clock_mod :: module(),
     clock,
     aggregate :: any(),
-    callback = undefined :: fun((...) -> any()),
-    pid = undefined :: pid() | undefined
+    callback = undefined :: fun((...) -> any())
 }).
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Start the monotonic window with the given conflation module, Mod, the
-%% given clock module, ClockMod, and the given clock Interval.
-%% @end
-%%--------------------------------------------------------------------
-
--spec start(Mod::module(), ClockMod::module(), Interval::integer()) -> pid().
-
 start(Mod, ClockMod, Interval) ->
-    {ok, EventPid } = gen_event:start_link(),
-    CallbackFun = fun(NewAggregate) ->
-        gen_event:notify(
-            EventPid,
-            {emit, Mod:emit(NewAggregate)}
-        )
-    end,
-    {_, Clock} = ClockMod:tick(ClockMod:new(Interval)),
-   spawn(?MODULE, loop, [#state{mod=Mod, clock_mod=ClockMod, clock=Clock, pid=EventPid, aggregate=Mod:init(), callback=CallbackFun}]).
+    eep_window:start(?MODULE, Mod, ClockMod, Interval).
 
 -spec new(Mod::module(), ClockMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(Mod, ClockMod, CallbackFun, Interval) ->
     {_, Clock} = ClockMod:tick(ClockMod:new(Interval)),
-    #state{mod=Mod, clock_mod=ClockMod, clock=Clock, aggregate=Mod:init(), callback=CallbackFun}.
+    #state{agg_mod=Mod, clock_mod=ClockMod, clock=Clock, aggregate=Mod:init(), callback=CallbackFun}.
 
 -spec new(Mod::module(), Seed::list(), ClockMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
 new(Mod, Seed, ClockMod, CallbackFun, Interval) ->
     {_, Clock} = ClockMod:tick(ClockMod:new(Interval)),
-    #state{mod=Mod, seed=Seed, clock_mod=ClockMod, clock=Clock, aggregate=Mod:init(Seed), callback=CallbackFun}.
+    #state{agg_mod=Mod, seed=Seed, clock_mod=ClockMod, clock=Clock, aggregate=Mod:init(Seed), callback=CallbackFun}.
 
 -spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
 push(State, Event) ->
     accum(State,Event).
-   
-%% @private. 
-loop(#state{pid=EventPid}=State) ->
-  receive
-    tick ->
-      {_,NewState} = tick(State),
-      loop(NewState);
-    { push, Event } ->
-      {_,NewState} = accum(State,Event),
-      loop(NewState);
-    { add_handler, Handler, Arr } ->
-      gen_event:add_handler(EventPid, Handler, Arr),
-      loop(State);
-    { delete_handler, Handler } ->
-      gen_event:delete_handler(EventPid, Handler, []),
-      loop(State);
-    stop ->
-      ok;
-    {debug, From} ->
-      From ! {debug, State},
-      loop(State)
-  end.
 
-accum(#state{mod=Mod, clock_mod=ClockMod, clock=Clock, aggregate=Agg}=State,Event) ->
+accum(#state{agg_mod=Mod, clock_mod=ClockMod, clock=Clock, aggregate=Agg}=State,Event) ->
     {noop, State#state{
-        mod=Mod,
+        agg_mod=Mod,
         clock=ClockMod:inc(Clock),
         aggregate=Mod:accumulate(Agg, Event)
     }}.
 
-tick(#state{mod=Mod, seed=Seed, aggregate=Agg, clock_mod=ClockMod, clock=Clock, callback=CallbackFun}=State) ->
-	{ Ticked, Tocked } =  ClockMod:tick(Clock),
-	case Ticked of
-		true ->
-		    case ClockMod:tock(Tocked) of
-			{true, Clock1} ->
-                CallbackFun(Agg),
-                {emit,State#state{aggregate=Mod:init(Seed),clock=Clock1}};
-			{false, _Clock1} ->
-                {noop,State#state{aggregate=Mod:init(Seed),clock=Tocked}}
-		    end;
-		false ->
-		    {noop,State}
-	end.
+tick(#state{callback=CallbackFun, agg_mod=AggMod, aggregate=Agg, seed=Seed,
+            clock_mod=CkMod, clock=Clock}=State) ->
+    case eep_clock:tick(CkMod, Clock) of
+        {noop, Clock} -> {noop, State#state{clock=Clock}};
+        {tock, Tocked} ->
+            CallbackFun(Agg),
+            {emit, State#state{aggregate=AggMod:init(Seed), clock=Tocked}}
+    end.

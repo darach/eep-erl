@@ -26,11 +26,27 @@
 
 -define(EEP_MAX, 10000000000000).
 
--record(eep_clock, {
-  at = undefined :: integer() | undefined,
-  mark = undefined :: integer() | undefined,
-  interval = 1 :: integer()
-}).
+-record(eep_clock,
+        {
+         at = undefined :: integer() | undefined,
+         mark = undefined :: integer() | undefined,
+         interval = 1 :: integer()
+        }).
+
+-record(eep_win,
+        {
+         type :: tumbling | sliding,
+         by :: event | ticks,
+         compensating :: boolean(),
+         size :: pos_integer(),
+         aggmod :: module(),
+         agg :: any(),
+         clockmod :: module(),
+         clock :: any(),
+         seed = [] :: list(),
+         count = 1,
+         log = eep_winlog:new() :: list(any())
+        }).
 
 -type ck_state() :: #eep_clock{}.
 -export_type([ck_state/0]).

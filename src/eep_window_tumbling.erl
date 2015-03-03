@@ -63,17 +63,13 @@
 -export([new/4]).
 -export([push/2]).
 
-%% @private.
--export([loop/1]).
-
 -record(state, {
     size :: integer(),
     mod :: module(),
     seed = [] :: list(),
     aggregate :: any(),
     callback = undefined :: fun((...) -> any()),
-    count = 1 :: integer(),
-    pid :: pid()
+    count = 1 :: integer()
 }).
 
 %%--------------------------------------------------------------------
@@ -93,58 +89,24 @@ start(Mod, Size) ->
             {emit, Mod:emit(NewAggregate)}
         )
     end,
-    spawn(?MODULE, loop, [#state{mod=Mod, size=Size, pid=EventPid, count=1, aggregate=Mod:init(), callback=CallbackFun}]).
+    State = new(Mod, CallbackFun, Size),
+    spawn(eep_window, loop, [?MODULE, EventPid, State]).
 
-%%
-%%
 %%
 -spec new(Mod::module(), CallbackFun::fun((...) -> any()), Size::integer()) ->#state{}.
 new(Mod, CallbackFun, Size) ->
-    #state{size = Size, seed=[], mod = Mod, callback = CallbackFun, aggregate=Mod:init()}. 
+    {CallbackFun, eep_window:tumbling(event, Size, Mod, [])}.
 
 -spec new(Mod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Size::integer()) ->#state{}.
 new(Mod, Seed, CallbackFun, Size) ->
-    #state{size = Size, seed=Seed, mod = Mod, callback = CallbackFun, aggregate=Mod:init(Seed)}. 
+    {CallbackFun, eep_window:tumbling(event, Size, Mod, Seed)}.
 
-%%
-%%
-%%
-%%
--spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
-push(State, Event) ->
-    tumble(State, Event).
-    
-%%--------------------------------------------------------------------
-%% @doc
-%% @end
-%%--------------------------------------------------------------------
-
--spec loop(State::#state{}) -> ok.
-loop(#state{pid=EventPid}=State) ->
-    receive
-	{ push, Event } ->
-        {_,NewState} = tumble(State,Event),
-        loop(NewState);
-	{ add_handler, Handler, Arr } ->
-	    gen_event:add_handler(EventPid, Handler, Arr),
-	    loop(State);
-	{ delete_handler, Handler } ->
-	    gen_event:delete_handler(EventPid, Handler, []),
-	    loop(State);
-	stop ->
-	    ok;
-	{debug, From} ->
-	    From ! {debug, State},
-	    loop(State)
+%-spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
+push({CBFun, Window}, Event) ->
+    case eep_window:push(Event, Window) of
+        {noop, Window1} ->
+            {noop, {CBFun, Window1}};
+        {{emit, Emission}, Window1} ->
+            CBFun(Emission),
+            {emit, {CBFun, Window1}}
     end.
-
-tumble(#state{mod=Mod, seed=Seed, size=Size, aggregate=Aggregate,count=Count,callback=CallbackFun}=State,Event) ->
-	NewAggregate = Mod:accumulate(Aggregate, Event),
-	case Count >= Size of
-	false -> 
-        {noop,State#state{aggregate=NewAggregate,count=Count+1}};
-	true ->	
-        CallbackFun(NewAggregate),
-        {emit,State#state{aggregate=Mod:init(Seed),count=1}}
-	end.
-

@@ -29,8 +29,20 @@
 -include_lib("proper/include/proper.hrl").
 
 -export([prop_avg_aggregate_accum/0]).
+-export([prop_sum_aggregate_accum/0]).
 -export([prop_monotonic_clock_count/0]).
+-export([prop_monotonic_sliding_window/0]).
 -export([prop_periodic_window/0]).
+-export([prop_tumbling_window/0]).
+-export([prop_sliding_window/0]).
+-export([prop_sliding_time_window/0]).
+-export([prop_wall_clock/0]).
+
+-export([sliding_time_window/2]).
+-export([expected_time_slider/2]).
+-export([time_slider/2]).
+-export([count_pushes/1]).
+-export([stride/2]).
 
 -define(epsilon, 1.0e-15).
 
@@ -55,6 +67,36 @@ range_magnitude(X, X) -> 1;
 range_magnitude(Min, Max) ->
     Order = math:log10(abs(Max - Min)),
     math:pow(10, Order).
+
+prop_sum_aggregate_accum() ->
+    ?FORALL(Ints, non_empty(list(integer())),
+            begin
+                {RealSum, AggData} =
+                    lists:foldl(
+                      fun(N, {Sum, State}) ->
+                              {Sum+N, eep_stats_sum:accumulate(State, N)}
+                      end, {0, eep_stats_sum:init()}, Ints),
+                    RealSum == eep_stats_sum:emit(AggData)
+            end).
+
+prop_wall_clock() ->
+    ?FORALL({Period, TickIntervals}, {500, list(integer(50, 100))},
+            begin
+                F = fun(I, {Cn, Cs, Ds, Ts}) ->
+                        timer:sleep(I),
+                        case eep_clock:tick(eep_clock_wall, Cn) of
+                            {noop, Cn1} ->
+                                Drift = eep_clock_wall:at(Cn1) - (eep_clock_wall:at(Cn) + I),
+                                {Cn1, [Cn|Cs], [Drift|Ds], Ts};
+                            {tock, Cn2} ->
+                                Drift = eep_clock_wall:at(Cn2) - (eep_clock_wall:at(Cn) + I),
+                                {Cn2, [Cn|Cs], [Drift|Ds], Ts+1}
+                        end end,
+                {_Cfinal, _Clocks, Drifts, Tocks} =
+                    lists:foldl(F, {eep_clock_wall:new(Period), [], [], 0}, TickIntervals),
+                ExpectedTocks = (lists:sum(Drifts) + lists:sum(TickIntervals)) div Period,
+                ExpectedTocks == Tocks
+            end).
 
 prop_monotonic_clock_count() ->
     ?FORALL({Interval, Events},
@@ -103,3 +145,126 @@ window_handle({push, _}=Push, {Window, Results}) ->
 window_handle(tick, {Window, Results}) ->
     {Act, Ticked} = eep_window_periodic:tick(Window),
     {Ticked, Results ++ [Act]}.
+
+prop_monotonic_sliding_window() ->
+    ?FORALL({Size, Integers}, {pos_integer(), non_empty(list(integer()))},
+            begin
+                Win = {eep_stats_sum:init(), Size, 1, [], none},
+                %% TODO Refactor eep_window_sliding so we can use it directly here
+                %% and not replicate its inner machinations below.
+                WinFinal = lists:foldl(fun slide_fold/2, Win, Integers),
+                {_, Size, _, _, Emission} = WinFinal,
+                if
+                    % We expect no emission if the input list is less than our window size
+                    Size > length(Integers) -> Emission == none;
+                    Size =< length(Integers) ->
+                        %% If Size is smaller than the number of input integers,
+                        %% the accumulated value will only be the sum of the
+                        %% last Size integers.
+                        Include = lists:sublist(lists:reverse(Integers), 1, Size),
+                        RealSum = lists:sum(Include),
+                        Emission == RealSum
+                end
+            end).
+
+%% NB This logic is copied directly from what was eep_window_sliding.erl
+slide_fold(Int, {Agg, Size, Count, Prior, LastEmission}) ->
+    NewAgg = eep_stats_sum:accumulate(Agg, Int),
+    if
+        Count < Size ->
+            NewPrior = Prior ++ [Int],
+            {NewAgg, Size, Count+1, NewPrior, LastEmission};
+        Count == Size ->
+            NewPrior = Prior ++ [Int],
+            {NewAgg, Size, Count+1, NewPrior, eep_stats_sum:emit(NewAgg)};
+        true ->
+            [Value | Tail] = Prior,
+            NewAgg2 = eep_stats_sum:compensate(NewAgg, Value),
+            NewPrior = Tail ++ [Int], {NewAgg2, Size, Count+1, NewPrior, eep_stats_sum:emit(NewAgg2)}
+    end.
+
+prop_tumbling_window() ->
+    ?FORALL({Size, Integers}, {pos_integer(), non_empty(list(integer()))},
+            begin
+                W0 = eep_window:tumbling(event, Size, eep_stats_sum, []),
+                {_Wn, As} = lists:foldl(fun push_folder/2, {W0, []}, Integers),
+                Emissions = [ eep_stats_sum:emit(A) || {emit,A} <- As],
+                Noops = [noop || noop <- As],
+                ExpEmissions = tumbling_expected(Size, Integers),
+                %% Number of 'emit' should be length(Integers) div Size
+                length(Emissions) == length(Integers) div Size
+                    %% The rest should have been noop
+                    andalso length(Noops) == length(Integers) - length(Emissions)
+                    %% The emitted values should match our expectation
+                    %% (see tumbling_expected/2 below)
+                    andalso Emissions == ExpEmissions
+            end).
+
+tumbling_expected(WinSize, Integers) ->
+    lists:reverse(tumbling_expected(WinSize, Integers, [])).
+tumbling_expected(WinSize, Integers, SoFar)
+  when WinSize > length(Integers) ->
+    SoFar;
+tumbling_expected(WinSize, Integers, SoFar) ->
+    Window = lists:sublist(Integers, 1, WinSize),
+    tumbling_expected(WinSize, lists:nthtail(WinSize, Integers), [lists:sum(Window) | SoFar]).
+
+prop_sliding_window() ->
+    ?FORALL({Size, Integers}, {pos_integer(), non_empty(list(integer()))},
+            begin
+                W0 = eep_window:sliding(event, Size, eep_stats_count, []),
+                {_Wn, As} = lists:foldl(fun push_folder/2, {W0, []}, Integers),
+                %% Expected: we emit for every event, except before we reach Size
+                %% events;
+                ExpEmissions = lists:duplicate(max(0, length(Integers) - Size + 1), Size),
+                Emissions = [ eep_stats_count:emit(A) || {emit, A} <- As ],
+                Noops = [ noop || noop <- As ],
+                Emissions == ExpEmissions
+                    andalso length(Noops) =< Size - 1
+            end).
+
+push_folder(Ev, {Win, As}) ->
+    {A, Win1} = eep_window:push(Ev, Win),
+    {Win1, As++[A]}.
+
+prop_sliding_time_window() ->
+    ?FORALL({Length, Events}, {pos_integer(), list(oneof([tick, push]))},
+            %{2, lists:flatten([ [lists:duplicate(N, push), tick] || N <- [0, 1, 2, 4] ])},
+            begin
+                Actions = sliding_time_window(Length, Events),
+                Exp = expected_time_slider(Length, Events),
+                [ A || A <- Actions, A =/= noop ] == Exp
+            end).
+
+sliding_time_window(Length, Events) ->
+    W0 = eep_window:sliding({clock, eep_clock_count, Length}, Length, eep_stats_count, []),
+    {_Wn, As} = lists:foldl(fun time_slider/2, {W0, []}, Events),
+    lists:reverse(As).
+
+time_slider(push, {W, As}) ->
+    {A, W1} = eep_window:push(1, W),
+    {W1, [A | As]};
+time_slider(tick, {W, As}) ->
+    {A, W1} = eep_window:tick(W),
+    {W1, [A | As]}.
+
+%% e.g.
+%% Length = 2, Interval = 2
+%% [ push, tick 1, push, push, tick 2, push, push, tick 3, tick 4  ]
+%% [ noop, noop,   noop, noop, emit 3, noop, noop, noop,   emit 2 ]
+expected_time_slider(WinSize, Events) ->
+    stride(WinSize, count_pushes(Events)).
+
+count_pushes(Events) ->
+    count_pushes(Events, 0, []).
+count_pushes([], _, Events) -> lists:reverse(Events);
+count_pushes([tick | Raw], N, Events) ->
+    count_pushes(Raw, 0, [ N | Events ]);
+count_pushes([push | Raw], N, Events) ->
+    count_pushes(Raw, N+1, Events).
+
+stride(Size, Events) when Size > length(Events) -> [];
+stride(Size, Events) ->
+    Window = lists:sublist(Events, Size),
+    Tail = lists:nthtail(Size, Events),
+    [{emit, lists:sum(Window)} | stride(Size, Tail)].

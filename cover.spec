@@ -1,8 +1,24 @@
+%{incl_dirs, ["ebin"]}.
 {incl_mods, [
-    eep_clock_wall
-    , eep_clock_count
-    , eep_window_tumbling
-    , eep_window_sliding
-    , eep_window_periodic
-    , eep_window_monotonic
-]}.
+	eep_aggregate,
+	eep_clock,
+	eep_clock_count,
+	eep_clock_wall,
+	eep_emit_trace,
+	eep_noop,
+	eep_stats_agg,
+	eep_stats_avg,
+	eep_stats_count,
+	eep_stats_dict_count,
+	eep_stats_max,
+	eep_stats_min,
+	eep_stats_stdevs,
+	eep_stats_sum,
+	eep_stats_vars,
+	eep_window,
+	eep_window_monotonic,
+	eep_window_periodic,
+	eep_window_sliding,
+	eep_window_sliding_time,
+	eep_window_tumbling,
+	eep_winlog]}.

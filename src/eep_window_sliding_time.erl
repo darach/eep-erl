@@ -1,5 +1,6 @@
 %% -------------------------------------------------------------------
-%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com > 
+%% Copyright (c) 2013 Darach Ennis < darach at gmail dot com >,
+%%                    Michael Coles < michael dot coles at gmail dot com >
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a
 %% copy of this software and associated documentation files (the
@@ -20,62 +21,48 @@
 %% OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 %% USE OR OTHER DEALINGS IN THE SOFTWARE.
 %%
-%% File: eep_window_periodic.erl. Periodic aggregate window.
+%% File: eep_window_sliding_time.erl. Sliding aggregate window by time.
 %%
 %% -------------------------------------------------------------------
 
--module(eep_window_periodic).
+-module(eep_window_sliding_time).
 
 -include_lib("eep_erl.hrl").
 
--export([start/2]).
--export([start/3]).
--export([new/3]).
 -export([new/4]).
 -export([new/5]).
--export([tick/1]).
 -export([push/2]).
+-export([tick/1]).
 
 -record(state, {
-    interval :: integer(),
-    agg_mod :: module(),
-    clock_mod :: module(),
+    size :: integer(),
+    mod :: module(),
     seed = [] :: list(),
-    clock,
     aggregate :: any(),
-    callback = undefined :: fun((...) -> any())
+    callback = undefined :: fun((...) -> any()),
+    count = 1 :: integer(),
+    prior = [] :: list()
 }).
 
-start(AggMod, Interval) ->
-    start(AggMod, eep_clock_wall, Interval).
-start(AggMod, ClockMod, Interval) ->
-    eep_window:start(?MODULE, AggMod, ClockMod, Interval).
+-spec new(Mod::module(), ClockMod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
+new(Mod, ClockMod, CallbackFun, Size) ->
+    new(Mod, [], ClockMod, CallbackFun, Size).
 
-new(AggMod, CallbackFun, Interval) ->
-    new(AggMod, eep_clock_wall, [], CallbackFun, Interval).
+-spec new(Mod::module(), Seed::list(), ClockMod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
+new(Mod, Seed, ClockMod, CallbackFun, Size) ->
+    {CallbackFun, eep_window:sliding({clock, ClockMod, Size}, 1, Mod, Seed)}.
 
--spec new(AggMod::module(), ClockMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
-new(AggMod, ClockMod, CallbackFun, Interval) ->
-    new(AggMod, ClockMod, [], CallbackFun, Interval).
+push({CBFun, Win}, Event) ->
+    case eep_window:push(Event, Win) of
+        {noop, Pushed} ->
+            {noop, {CBFun, Pushed}};
+        {{emit, _}, _} ->
+            throw({emission,on,push,for,time,window})
+    end.
 
--spec new(AggMod::module(),
-          ClockMod::module(),
-          Seed::list(),
-          CallbackFun,
-          Integer::integer()) ->
-    {CallbackFun, #eep_win{}}
-      when CallbackFun :: fun((...) -> any()).
-new(AggMod, ClockMod, Seed, CallbackFun, Interval) ->
-    {CallbackFun, eep_window:tumbling({clock, ClockMod, Interval}, 1, AggMod, Seed)}.
-
--spec push(#eep_win{}, any()) -> {noop,#eep_win{}}.
-push({CBFun, Window}, Event) ->
-    {noop, Pushed} = eep_window:push(Event, Window),
-    {noop, {CBFun, Pushed}}.
-
-tick({CBFun, Window}) ->
-    case eep_window:tick(Window) of
-        {noop, Next} -> {noop, {CBFun, Next}};
+tick({CBFun, Win}) ->
+    case eep_window:tick(Win) of
+        {noop, Ticked} -> {noop, {CBFun, Ticked}};
         {{emit, Emission}, Next} ->
             CBFun(Emission),
             {emit, {CBFun, Next}}
