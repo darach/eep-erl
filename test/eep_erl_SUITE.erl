@@ -112,20 +112,18 @@ init_per_suite(Config) ->
     Config.
 
 t_clock_wall(_Config) ->
-    crock = eep_clock_wall:name(),
-    C0 = eep_clock_wall:new(1),
-    {eep_clock,_,At,_} = C0,
-    At = eep_clock_wall:at(C0),
+    M = eep_clock_wall,
+    crock = M:name(),
+    C0 = M:new(1),
     timer:sleep(1),
-    T0 = eep_clock_wall:ts(),
+    T0 = M:ts(),
     true = (T0 - C0#eep_clock.at) >= 1,
     timer:sleep(1),
-    {true, C1} = eep_clock_wall:tick(C0),
+    {tock, C1} = eep_clock:tick(M, C0),
     true = (C1#eep_clock.at - T0) >= 1,
     T1 = C1#eep_clock.at,
-    {true,C2} = eep_clock_wall:tick(C1),
-    {true,C3} = eep_clock_wall:tock(C2),
-    true = C3#eep_clock.mark =< T1.
+    {tock,C2} = eep_clock:tick(M, C1),
+    true = C2#eep_clock.mark =< T1.
 
 t_clock_count(_Config) ->
     M = eep_clock_count,

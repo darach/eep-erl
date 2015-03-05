@@ -36,7 +36,6 @@
 -export([at/1]).
 -export([new/1]).
 -export([inc/1]).
--export([tick/1]).
 -export([tock/1]).
 
 %% impl
@@ -54,11 +53,6 @@ new(Interval) ->
 
 inc(State) -> 
   State#eep_clock{at = ts()}.
-
-tick(State) ->
-  NewState = inc(State),
-  #eep_clock{at=At, mark=Mark, interval=Interval}=NewState,
-  {(At - Mark) >= Interval, NewState}.
 
 tock(State) ->
   Delta = State#eep_clock.at - State#eep_clock.mark,

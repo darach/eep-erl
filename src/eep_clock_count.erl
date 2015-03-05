@@ -35,7 +35,6 @@
 -export([at/1]).
 -export([new/1]).
 -export([inc/1]).
--export([tick/1]).
 -export([tock/1]).
 
 name() -> count.
@@ -48,10 +47,6 @@ new(Interval) ->
 
 inc(State) -> 
   State#eep_clock{at = State#eep_clock.at + 1}.
-
-tick(State) ->
-  NewState = inc(State),
-  {(NewState#eep_clock.at - NewState#eep_clock.mark) >= NewState#eep_clock.interval, NewState}.
 
 tock(State) ->
   Delta = State#eep_clock.at - State#eep_clock.mark,

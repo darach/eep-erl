@@ -111,14 +111,11 @@ prop_monotonic_clock_count() ->
            end).
 
 clock_handle(tick, {Clock, Tocks}) ->
-    case eep_clock_count:tick(Clock) of
-        {false, TickedClock} ->
+    case eep_clock:tick(eep_clock_count, Clock) of
+        {noop, TickedClock} ->
             {TickedClock, Tocks};
-        {true, TockingClock} ->
-            case eep_clock_count:tock(TockingClock) of
-                {true, Tocked} -> {Tocked, Tocks+1};
-                {false, Tocked} -> {Tocked, Tocks}
-            end
+        {tock, TockingClock} ->
+            {TockingClock, Tocks+1}
     end;
 clock_handle(Event, _Clock) ->
     error({unhandled_clock_event, Event}).
