@@ -128,19 +128,19 @@ t_clock_wall(_Config) ->
     true = C3#eep_clock.mark =< T1.
 
 t_clock_count(_Config) ->
-  count = eep_clock_count:name(),
-  C0 = eep_clock_count:new(2),
-  0  = eep_clock_count:at(C0),
-  {false, C1} = eep_clock_count:tick(C0),
-  0  = eep_clock_count:at(C1),
-  {true,C2} = eep_clock_count:tick(C1),
-  {true,C3}  = eep_clock_count:tock(C2),
-  {false,C4}  = eep_clock_count:tick(C3),
-
-  {true, C5} = eep_clock_count:tock(C4),
-  {true,C6} = eep_clock_count:tock(C5),
-  6 = eep_clock_count:at(C6),
-  6 = C6#eep_clock.mark.
+    M = eep_clock_count,
+    count = M:name(),
+    C0 = M:new(2),
+    0  = M:at(C0),
+    {noop, C1} = eep_clock:tick(M, C0),
+    1  = M:at(C1),
+    {tock, C2} = eep_clock:tick(M, C1),
+    {noop, C3} = eep_clock:tick(M, C2),
+    {tock, C4} = eep_clock:tick(M, C3),
+    {noop, C5} = eep_clock:tick(M, C4),
+    {tock, C6} = eep_clock:tick(M, C5),
+    6 = M:at(C6),
+    6 = C6#eep_clock.mark.
 
 t_win_tumbling_inline(_Config) ->
     W0  = eep_window_tumbling:new(eep_stats_count, fun(_Callback) -> boop end, 2),

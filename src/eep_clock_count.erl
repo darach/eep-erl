@@ -41,7 +41,7 @@
 name() -> count.
 
 at(State) -> 
- State#eep_clock.mark.
+ State#eep_clock.at.
 
 new(Interval) ->
   #eep_clock{at = 0, mark = 0, interval = Interval}.
@@ -54,9 +54,8 @@ tick(State) ->
   {(NewState#eep_clock.at - NewState#eep_clock.mark) >= NewState#eep_clock.interval, NewState}.
 
 tock(State) ->
-    #eep_clock{mark=Mark, interval=Interval} = State,
-    Delta = State#eep_clock.at,
-    case Delta >= State#eep_clock.interval of
-        true -> {true, State#eep_clock{mark = (Mark + Interval)}};
-        false -> {false, State}
-    end.
+  Delta = State#eep_clock.at - State#eep_clock.mark,
+  case Delta >= State#eep_clock.interval of
+    true -> {true, State#eep_clock{mark = State#eep_clock.mark + State#eep_clock.interval}};
+    false -> {false, State}
+  end.
