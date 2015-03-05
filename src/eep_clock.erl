@@ -38,8 +38,6 @@
     ck_state().
 -callback inc(Old :: ck_state()) ->
     New :: ck_state().
--callback tock(Old :: ck_state()) ->
-    {Tocked :: boolean(), New :: ck_state()}.
 
 -spec tick(module(), Curr :: ck_state()) ->
     {noop, UnTicked :: ck_state()}
@@ -48,7 +46,14 @@ tick(CkMod, Clock0) ->
     Clock1 = CkMod:inc(Clock0),
     #eep_clock{at=At, mark=Mark, interval=Interval}=Clock1,
     if (At - Mark) >= Interval ->
-           {_, Tocked} = CkMod:tock(Clock1),
+           {_, Tocked} = tock(Clock1),
            {tock, Tocked};
        true -> {noop, Clock1}
     end.
+
+tock(Clock0) ->
+  Delta = Clock0#eep_clock.at - Clock0#eep_clock.mark,
+  case Delta >= Clock0#eep_clock.interval of
+    true -> {true, Clock0#eep_clock{mark = Clock0#eep_clock.mark + Clock0#eep_clock.interval}};
+    false -> {false, Clock0}
+  end.
