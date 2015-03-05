@@ -45,7 +45,7 @@
 name() -> crock.
 
 at(State) -> 
- State#eep_clock.mark.
+ State#eep_clock.at.
 
 new(Interval) ->
   At = ts(),
