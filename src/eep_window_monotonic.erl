@@ -51,32 +51,27 @@
 start(Mod, ClockMod, Interval) ->
     eep_window:start(?MODULE, Mod, ClockMod, Interval).
 
--spec new(Mod::module(), ClockMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
-new(Mod, ClockMod, CallbackFun, Interval) ->
-    {_, Clock} = ClockMod:tick(ClockMod:new(Interval)),
-    #state{agg_mod=Mod, clock_mod=ClockMod, clock=Clock, aggregate=Mod:init(), callback=CallbackFun}.
 
--spec new(Mod::module(), Seed::list(), ClockMod::module(), CallbackFun::fun((...) -> any()), Integer::integer()) -> #state{}.
-new(Mod, Seed, ClockMod, CallbackFun, Interval) ->
-    {_, Clock} = ClockMod:tick(ClockMod:new(Interval)),
-    #state{agg_mod=Mod, seed=Seed, clock_mod=ClockMod, clock=Clock, aggregate=Mod:init(Seed), callback=CallbackFun}.
+new(Mod, eep_clock_count, CallbackFun, Interval) ->
+    new(Mod, [], eep_clock_count, CallbackFun, Interval).
+
+new(Mod, Seed, eep_clock_count, CallbackFun, Interval) ->
+    {CallbackFun,
+     eep_window:tumbling({clock, eep_clock_count, Interval}, 1, Mod, Seed)}.
 
 -spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
-push(State, Event) ->
-    accum(State,Event).
+push({CBFun, W0}, Event) ->
+    case eep_window:push(Event, W0) of
+        {{emit, Em}, W1} ->
+            CBFun(Em),
+            {emit, {CBFun, W1}};
+        {noop, W1} -> {noop, {CBFun, W1}}
+    end.
 
-accum(#state{agg_mod=Mod, clock_mod=ClockMod, clock=Clock, aggregate=Agg}=State,Event) ->
-    {noop, State#state{
-        agg_mod=Mod,
-        clock=ClockMod:inc(Clock),
-        aggregate=Mod:accumulate(Agg, Event)
-    }}.
-
-tick(#state{callback=CallbackFun, agg_mod=AggMod, aggregate=Agg, seed=Seed,
-            clock_mod=CkMod, clock=Clock}=State) ->
-    case eep_clock:tick(CkMod, Clock) of
-        {noop, Clock} -> {noop, State#state{clock=Clock}};
-        {tock, Tocked} ->
-            CallbackFun(Agg),
-            {emit, State#state{aggregate=AggMod:init(Seed), clock=Tocked}}
+tick({CBFun, W0}) ->
+    case eep_window:tick(W0) of
+        {noop, W1} -> {noop, {CBFun, W1}};
+        {{emit, Em}, W1} ->
+            CBFun(Em),
+            {emit, {CBFun, W1}}
     end.
