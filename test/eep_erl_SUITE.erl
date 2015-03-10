@@ -77,19 +77,19 @@ groups() ->
             t_clock_wall
             , t_clock_count
             ]},
-        {win_tumbling, [], [
+        {win_tumbling, [sequence], [
             t_win_tumbling_inline,
             t_win_tumbling_process
             ]},
-        {win_sliding, [], [
+        {win_sliding, [sequence], [
             t_win_sliding_inline,
             t_win_sliding_process
             ]},
-        {win_periodic, [], [
+        {win_periodic, [sequence], [
             t_win_periodic_inline,
             t_win_periodic_process
             ]},
-        {win_monotonic, [], [
+        {win_monotonic, [sequence], [
             t_win_monotonic_inline,
             t_win_monotonic_process
             ]},
