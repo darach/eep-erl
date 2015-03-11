@@ -32,7 +32,6 @@
 
 -export([tumbling/4]).
 -export([sliding/4]).
--export([push/2]).
 -export([tick/1]).
 
 %% DEBUG
@@ -60,10 +59,6 @@ sliding(event, Size, Aggregate, Seed) ->
     W#eep_win{by=event}. %% TODO FIXME
 
 %% Window command interface.
-push(Event, #eep_win{by=time}=Win) ->
-    decide([{accumulate, Event}], Win);
-push(Event, #eep_win{by=event}=Win) ->
-    decide([{accumulate, Event}, tick], Win).
 
 %% A thin wrapper that allows to stop external parties ticking a by-event window.
 %% TODO THis might be unnecessary - maybe we don't need to make this restriction?

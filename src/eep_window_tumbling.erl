@@ -103,7 +103,7 @@ new(Mod, Seed, CallbackFun, Size) ->
 
 %-spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
 push({CBFun, Window}, Event) ->
-    case eep_window:push(Event, Window) of
+    case eep_window:decide([{accumulate, Event}, tick], Window) of
         {noop, Window1} ->
             {noop, {CBFun, Window1}};
         {{emit, Emission}, Window1} ->

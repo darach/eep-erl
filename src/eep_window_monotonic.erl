@@ -61,7 +61,7 @@ new(Mod, Seed, eep_clock_count, CallbackFun, Interval) ->
 
 -spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
 push({CBFun, W0}, Event) ->
-    case eep_window:push(Event, W0) of
+    case eep_window:decide([{accumulate, Event}], W0) of
         {{emit, Em}, W1} ->
             CBFun(Em),
             {emit, {CBFun, W1}};

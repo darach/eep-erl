@@ -53,7 +53,7 @@ new(Mod, Seed, ClockMod, CallbackFun, Size) ->
     {CallbackFun, eep_window:sliding({clock, ClockMod, Size}, 1, Mod, Seed)}.
 
 push({CBFun, Win}, Event) ->
-    case eep_window:push(Event, Win) of
+    case eep_window:decide([{accumulate, Event}], Win) of
         {noop, Pushed} ->
             {noop, {CBFun, Pushed}};
         {{emit, _}, _} ->

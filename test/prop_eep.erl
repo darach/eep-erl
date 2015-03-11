@@ -27,6 +27,7 @@
 -module(prop_eep).
 
 -include_lib("proper/include/proper.hrl").
+-include("eep_erl.hrl").
 
 -export([prop_avg_aggregate_accum/0]).
 -export([prop_sum_aggregate_accum/0]).
@@ -220,8 +221,11 @@ prop_sliding_window() ->
                     andalso length(Noops) =< Size - 1
             end).
 
-push_folder(Ev, {Win, As}) ->
-    {A, Win1} = eep_window:push(Ev, Win),
+push_folder(Ev, {#eep_win{by=event}=Win, As}) ->
+    {A, Win1} = eep_window:decide([{accumulate, Ev}, tick], Win),
+    {Win1, As++[A]};
+push_folder(Ev, {#eep_win{by=time}=Win, As}) ->
+    {A, Win1} = eep_window:decide([{accumulate, Ev}], Win),
     {Win1, As++[A]}.
 
 prop_sliding_time_window() ->
@@ -239,7 +243,12 @@ sliding_time_window(Length, Events) ->
     lists:reverse(As).
 
 time_slider(push, {W, As}) ->
-    {A, W1} = eep_window:push(1, W),
+    Actions =
+        case W#eep_win.by of
+            time -> [{accumulate, 1}];
+            event -> [{accumulate, 1}, tick]
+        end,
+    {A, W1} = eep_window:decide(Actions, W),
     {W1, [A | As]};
 time_slider(tick, {W, As}) ->
     {A, W1} = eep_window:tick(W),
