@@ -95,7 +95,7 @@ start(Mod, Size) ->
 %%
 -spec new(Mod::module(), CallbackFun::fun((...) -> any()), Size::integer()) ->#state{}.
 new(Mod, CallbackFun, Size) ->
-    {CallbackFun, eep_window:tumbling(event, Size, Mod, [])}.
+    new(Mod, [], CallbackFun, Size).
 
 -spec new(Mod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Size::integer()) ->#state{}.
 new(Mod, Seed, CallbackFun, Size) ->
