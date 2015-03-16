@@ -35,7 +35,7 @@
 -export([tick/1]).
 
 %% DEBUG
--export([accumulate/2, compensate/1, decide/2, decide/3, tick_/1]).
+-export([accumulate/2, compensate/1, reset/1, decide/2, decide/3, tick_/1]).
 
 -include("eep_erl.hrl").
 
@@ -98,9 +98,10 @@ accumulate(Event, #eep_win{aggmod=AMod, agg=Agg, count=Count, log=Log}=Win) ->
            Accumed
     end.
 
-compensate(#eep_win{compensating=false}=Win) ->
+reset(#eep_win{compensating=false}=Win) ->
     #eep_win{aggmod=AMod, seed=Seed}=Win,
-    Win#eep_win{agg=(AMod:init(Seed)), count=1};
+    Win#eep_win{agg=(AMod:init(Seed)), count=1}.
+
 compensate(#eep_win{compensating=true}=Win) ->
     #eep_win{aggmod=AMod, agg=Agg, size=S, log=Log, clockmod=CM, clock=C}=Win,
     At = CM:at(C),
@@ -129,7 +130,7 @@ decide([ emit |Actions], #eep_win{count=C, size=S}=Window, noop)
     decide(Actions, Window, noop);
 decide([ emit |Actions], #eep_win{}=Window, noop) ->
     %% TODO This enforces only one emission per decision: is this right?
-    decide([ compensate | Actions ], Window, {emit, Window#eep_win.agg}).
+    decide(Actions, Window, {emit, Window#eep_win.agg}).
 
 %% Process functionality: utils for running windows as a process.
 start(Window, AggMod, Interval) ->

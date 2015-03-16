@@ -78,5 +78,5 @@ tick({CBFun, Window}) ->
         {noop, Next} -> {noop, {CBFun, Next}};
         {{emit, Emission}, Next} ->
             CBFun(Emission),
-            {emit, {CBFun, Next}}
+            {emit, {CBFun, eep_window:reset(Next)}}
     end.

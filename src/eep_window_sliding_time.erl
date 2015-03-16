@@ -50,7 +50,11 @@ new(Mod, ClockMod, CallbackFun, Size) ->
 
 -spec new(Mod::module(), Seed::list(), ClockMod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
 new(Mod, Seed, ClockMod, CallbackFun, Size) ->
-    {CallbackFun, eep_window:sliding({clock, ClockMod, Size}, 1, Mod, Seed)}.
+    W0 = eep_window:sliding({clock, ClockMod, 1}, Size, Mod, Seed),
+    C0 = W0#eep_win.clock,
+    L0 = W0#eep_win.log,
+    L1 = eep_winlog:tick(ClockMod:at(C0), L0),
+    {CallbackFun, W0#eep_win{log=L1}}.
 
 push({CBFun, Win}, Event) ->
     case eep_window:decide([{accumulate, Event}], Win) of
@@ -63,7 +67,23 @@ push({CBFun, Win}, Event) ->
 tick({CBFun, Win}) ->
     case eep_window:tick(Win) of
         {noop, Ticked} -> {noop, {CBFun, Ticked}};
-        {{emit, Emission}, Next} ->
-            CBFun(Emission),
-            {emit, {CBFun, Next}}
+        {{emit, _Emission}, Next} -> %% TODO Might need to also use Emission here?
+            {Emissions, WinN} = expire_and_emit(CBFun, Next),
+            {Emissions, {CBFun, WinN}}
+    end.
+
+expire_and_emit(CBFun, #eep_win{}=Win0) ->
+    #eep_win{aggmod=AMod, agg=Agg, size=S, log=Log, clockmod=CM, clock=C}=Win0,
+    At = CM:at(C),
+    case eep_winlog:expire(At - S, Log) of
+        {[], Current} -> %% Nothing expiring
+            {noop, Win0#eep_win{log=Current}};
+        {Expiring, Current} ->
+            {Compensated, Emissions} = lists:foldl(fun(E, {A0, Ems}) ->
+                                              CBFun(A0), %% side effect
+                                              A1 = AMod:compensate(A0, E),
+                                              {A1, Ems++[{emit, A0}]}
+                                      end,
+                                      {Agg, []}, Expiring),
+            {Emissions, Win0#eep_win{agg=Compensated, log=Current}}
     end.

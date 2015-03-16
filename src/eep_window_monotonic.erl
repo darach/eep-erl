@@ -64,7 +64,7 @@ push({CBFun, W0}, Event) ->
     case eep_window:decide([{accumulate, Event}], W0) of
         {{emit, Em}, W1} ->
             CBFun(Em),
-            {emit, {CBFun, W1}};
+            {emit, {CBFun, eep_window:reset(W1)}};
         {noop, W1} -> {noop, {CBFun, W1}}
     end.
 
@@ -73,5 +73,5 @@ tick({CBFun, W0}) ->
         {noop, W1} -> {noop, {CBFun, W1}};
         {{emit, Em}, W1} ->
             CBFun(Em),
-            {emit, {CBFun, W1}}
+            {emit, {CBFun, eep_window:reset(W1)}}
     end.

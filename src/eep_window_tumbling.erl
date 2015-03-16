@@ -62,6 +62,7 @@
 -export([new/3]).
 -export([new/4]).
 -export([push/2]).
+-export([tick/1]).
 
 -record(state, {
     size :: integer(),
@@ -108,5 +109,7 @@ push({CBFun, Window}, Event) ->
             {noop, {CBFun, Window1}};
         {{emit, Emission}, Window1} ->
             CBFun(Emission),
-            {emit, {CBFun, Window1}}
+            {emit, {CBFun, eep_window:reset(Window1)}}
     end.
+
+tick({_, _}=Win) -> {noop, Win}.

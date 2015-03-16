@@ -42,8 +42,8 @@
 -export([sliding_time_window/2]).
 -export([expected_time_slider/2]).
 -export([time_slider/2]).
--export([count_pushes/1]).
--export([stride/2]).
+-export([compress_time_buckets/1]).
+%-export([stride/2]).
 
 -define(epsilon, 1.0e-15).
 
@@ -221,12 +221,22 @@ prop_sliding_window() ->
                     andalso length(Noops) =< Size - 1
             end).
 
-push_folder(Ev, {#eep_win{by=event}=Win, As}) ->
-    {A, Win1} = eep_window:decide([{accumulate, Ev}, tick], Win),
-    {Win1, As++[A]};
-push_folder(Ev, {#eep_win{by=time}=Win, As}) ->
-    {A, Win1} = eep_window:decide([{accumulate, Ev}], Win),
-    {Win1, As++[A]}.
+push_folder(Ev, {#eep_win{by=By, compensating=Com}=Win, As}) ->
+    Tl = case By of event -> [tick]; time -> [] end,
+    L = [{accumulate, Ev} | Tl],
+    Post = case Com of true -> compensate; false -> reset end,
+    case eep_window:decide(L, Win) of
+        {{emit,_}=Em, Win1} ->
+            {eep_window:Post(Win1), As++[Em]};
+        {Other, Win1} ->
+            {Win1, As++[Other]}
+    end.
+%push_folder(Ev, {#eep_win{by=event}=Win, As}) ->
+%    {A, Win1} = eep_window:decide([{accumulate, Ev}, tick], Win),
+%    {Win1, As++[A]};
+%push_folder(Ev, {#eep_win{by=time}=Win, As}) ->
+%    {A, Win1} = eep_window:decide([{accumulate, Ev}], Win),
+%    {Win1, As++[A]}.
 
 prop_sliding_time_window() ->
     ?FORALL({Length, Events}, {pos_integer(), list(oneof([tick, push]))},
@@ -234,43 +244,41 @@ prop_sliding_time_window() ->
             begin
                 Actions = sliding_time_window(Length, Events),
                 Exp = expected_time_slider(Length, Events),
-                [ A || A <- Actions, A =/= noop ] == Exp
+                [ A || A <- lists:flatten(Actions), A =/= noop ] == Exp
             end).
 
+%% e.g.
+%% Length = 2
+%% [ push, push, tick, push, tick,                    tick,       push, tick, push, push, tick,        tick,                   tick ]
+%% [ noop, noop, noop, noop, [{emit, 3}, {emit, 2}], [{emit, 1}], noop, noop, noop, noop, [{emit, 3}], [{emit, 2}, {emit, 1}], noop ]
+
+expected_time_slider(Size, Events) ->
+    create_emissions(Size, compress_time_buckets(Events), []).
+
+compress_time_buckets(Raw) -> compress_time_buckets(Raw, 0, []).
+compress_time_buckets([], _, Compd) -> lists:reverse(Compd);
+compress_time_buckets([push | Raw], B, Bs) ->
+    compress_time_buckets(Raw, B+1, Bs);
+compress_time_buckets([tick | Raw], B, Bs) ->
+    compress_time_buckets(Raw, 0, [B | Bs]).
+
+create_emissions(S, Short, Emissions)
+  when length(Short) < S -> Emissions;
+create_emissions(_, [], Emissions) -> Emissions;
+create_emissions(Size, Buckets, Emissions) ->
+    [Bucket|Tail] = Buckets,
+    WinScope = lists:sublist(Buckets, Size),
+    WinTotal = lists:sum(WinScope),
+    create_emissions(Size, Tail, Emissions++[ {emit, N} || N <- lists:seq(WinTotal, WinTotal-Bucket+1, -1) ]).
+
 sliding_time_window(Length, Events) ->
-    W0 = eep_window:sliding({clock, eep_clock_count, Length}, 1, eep_stats_count, []),
+    W0 = eep_window_sliding_time:new(eep_stats_count, eep_clock_count, fun(_) -> ok end, Length),
     {_Wn, As} = lists:foldl(fun time_slider/2, {W0, []}, Events),
     lists:reverse(As).
 
 time_slider(push, {W, As}) ->
-    Actions =
-        case W#eep_win.by of
-            time -> [{accumulate, 1}];
-            event -> [{accumulate, 1}, tick]
-        end,
-    {A, W1} = eep_window:decide(Actions, W),
+    {A, W1} = eep_window_sliding_time:push(W, 1),
     {W1, [A | As]};
 time_slider(tick, {W, As}) ->
-    {A, W1} = eep_window:tick(W),
+    {A, W1} = eep_window_sliding_time:tick(W),
     {W1, [A | As]}.
-
-%% e.g.
-%% Length = 2, Interval = 2
-%% [ push, tick 1, push, push, tick 2, push, push, tick 3, tick 4  ]
-%% [ noop, noop,   noop, noop, emit 3, noop, noop, noop,   emit 2 ]
-expected_time_slider(WinSize, Events) ->
-    stride(WinSize, count_pushes(Events)).
-
-count_pushes(Events) ->
-    count_pushes(Events, 0, []).
-count_pushes([], _, Events) -> lists:reverse(Events);
-count_pushes([tick | Raw], N, Events) ->
-    count_pushes(Raw, 0, [ N | Events ]);
-count_pushes([push | Raw], N, Events) ->
-    count_pushes(Raw, N+1, Events).
-
-stride(Size, Events) when Size > length(Events) -> [];
-stride(Size, Events) ->
-    Window = lists:sublist(Events, Size),
-    Tail = lists:nthtail(Size, Events),
-    [{emit, lists:sum(Window)} | stride(Size, Tail)].

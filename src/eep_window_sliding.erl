@@ -69,8 +69,7 @@ push({CBFun, Win}, Event) ->
             {noop, {CBFun, Pushed}};
         {{emit, Emission}, Pushed} ->
             CBFun(Emission),
-            {emit, {CBFun, Pushed}}
+            {emit, {CBFun, eep_window:compensate(Pushed)}}
     end.
 
-tick(_) ->
-    error({dont, tick, me, bro}).
+tick({_,_}=Win) -> {noop, Win}.
