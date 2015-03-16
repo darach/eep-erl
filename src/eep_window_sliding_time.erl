@@ -34,22 +34,16 @@
 -export([push/2]).
 -export([tick/1]).
 
--record(state, {
-    size :: integer(),
-    mod :: module(),
-    seed = [] :: list(),
-    aggregate :: any(),
-    callback = undefined :: fun((...) -> any()),
-    count = 1 :: integer(),
-    prior = [] :: list()
-}).
-
--spec new(Mod::module(), ClockMod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
+-spec new(Mod::module(), ClockMod::module(), CallbackFun, Size::integer()) ->
+    {CallbackFun, #eep_win{}}
+      when CallbackFun :: fun((...) -> any()).
 new(Mod, ClockMod, CallbackFun, Size) ->
     new(Mod, [], ClockMod, CallbackFun, Size).
 
--spec new(Mod::module(), Seed::list(), ClockMod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
-new(Mod, Seed, ClockMod, CallbackFun, Size) ->
+-spec new(Mod::module(), ClockMod::module(), Seed::list(), CallbackFun, Size::integer()) ->
+    {CallbackFun, #eep_win{}}
+      when CallbackFun :: fun((...) -> any()).
+new(Mod, ClockMod, Seed, CallbackFun, Size) ->
     W0 = eep_window:sliding({clock, ClockMod, 1}, Size, Mod, Seed),
     C0 = W0#eep_win.clock,
     L0 = W0#eep_win.log,
