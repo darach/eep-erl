@@ -67,6 +67,9 @@ push({CBFun, Win}, Event) ->
     case eep_window:decide([{accumulate, Event}, tick], Win) of
         {noop, Pushed} ->
             {noop, {CBFun, Pushed}};
+        {{emit, _}, #eep_win{count=C, size=S}=Pushed}
+          when C =< S ->
+            {noop, {CBFun, Pushed}};
         {{emit, Emission}, Pushed} ->
             CBFun(Emission),
             {emit, {CBFun, eep_window:compensate(Pushed)}}

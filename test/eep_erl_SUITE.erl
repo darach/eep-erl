@@ -129,15 +129,15 @@ t_clock_count(_Config) ->
     M = eep_clock_count,
     count = M:name(),
     C0 = M:new(2),
-    0  = M:at(C0),
+    0  = eep_clock:at(C0),
     {noop, C1} = eep_clock:tick(M, C0),
-    1  = M:at(C1),
+    1  = eep_clock:at(C1),
     {tock, C2} = eep_clock:tick(M, C1),
     {noop, C3} = eep_clock:tick(M, C2),
     {tock, C4} = eep_clock:tick(M, C3),
     {noop, C5} = eep_clock:tick(M, C4),
     {tock, C6} = eep_clock:tick(M, C5),
-    6 = M:at(C6),
+    6 = eep_clock:at(C6),
     6 = C6#eep_clock.mark.
 
 t_win_tumbling_inline(_Config) ->

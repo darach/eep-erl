@@ -87,10 +87,10 @@ prop_wall_clock() ->
                         timer:sleep(I),
                         case eep_clock:tick(eep_clock_wall, Cn) of
                             {noop, Cn1} ->
-                                Drift = eep_clock_wall:at(Cn1) - (eep_clock_wall:at(Cn) + I),
+                                Drift = eep_clock:at(Cn1) - (eep_clock:at(Cn) + I),
                                 {Cn1, [Cn|Cs], [Drift|Ds], Ts};
                             {tock, Cn2} ->
-                                Drift = eep_clock_wall:at(Cn2) - (eep_clock_wall:at(Cn) + I),
+                                Drift = eep_clock:at(Cn2) - (eep_clock:at(Cn) + I),
                                 {Cn2, [Cn|Cs], [Drift|Ds], Ts+1}
                         end end,
                 {_Cfinal, _Clocks, Drifts, Tocks} =
@@ -107,7 +107,7 @@ prop_monotonic_clock_count() ->
                {Clock, Tocks} = lists:foldl(fun clock_handle/2,
                                             {Init, 0}, Events),
                ExpectedTime = length(Events),
-               eep_clock_count:at(Clock) == ExpectedTime
+               eep_clock:at(Clock) == ExpectedTime
                     andalso Tocks == length(Events) div Interval
            end).
 
@@ -231,12 +231,6 @@ push_folder(Ev, {#eep_win{by=By, compensating=Com}=Win, As}) ->
         {Other, Win1} ->
             {Win1, As++[Other]}
     end.
-%push_folder(Ev, {#eep_win{by=event}=Win, As}) ->
-%    {A, Win1} = eep_window:decide([{accumulate, Ev}, tick], Win),
-%    {Win1, As++[A]};
-%push_folder(Ev, {#eep_win{by=time}=Win, As}) ->
-%    {A, Win1} = eep_window:decide([{accumulate, Ev}], Win),
-%    {Win1, As++[A]}.
 
 prop_sliding_time_window() ->
     ?FORALL({Length, Events}, {pos_integer(), list(oneof([tick, push]))},

@@ -28,16 +28,25 @@
 
 -include_lib("eep_erl.hrl").
 
+-export([at/1]).
+-export([elapsed/1]).
 -export([tick/2]).
 
 -callback name() ->
     Name :: atom().
--callback at(ck_state()) ->
-    Now :: integer().
 -callback new(Interval :: integer()) ->
     ck_state().
 -callback inc(Old :: ck_state()) ->
     New :: ck_state().
+
+-spec at(ck_state()) ->
+    Now :: integer().
+at(#eep_clock{at=At}) -> At.
+
+-spec elapsed(ck_state()) ->
+    Now :: integer().
+elapsed(#eep_clock{origin=Origin, at=At}) ->
+    At - Origin.
 
 -spec tick(module(), Curr :: ck_state()) ->
     {noop, UnTicked :: ck_state()}

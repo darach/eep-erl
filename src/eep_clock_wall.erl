@@ -33,7 +33,6 @@
 
 %% clock behaviour.
 -export([name/0]).
--export([at/1]).
 -export([new/1]).
 -export([inc/1]).
 
@@ -42,13 +41,10 @@
 
 name() -> crock.
 
-at(State) -> 
- State#eep_clock.at.
-
 new(Interval) ->
   At = ts(),
   Mark = At,
-  #eep_clock{at = At, interval = Interval, mark=Mark}.
+  #eep_clock{origin = At, at = At, interval = Interval, mark=Mark}.
 
 inc(State) -> 
   State#eep_clock{at = ts()}.

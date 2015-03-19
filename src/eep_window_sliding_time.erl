@@ -38,7 +38,7 @@
     {CallbackFun, #eep_win{}}
       when CallbackFun :: fun((...) -> any()).
 new(Mod, ClockMod, CallbackFun, Size) ->
-    new(Mod, [], ClockMod, CallbackFun, Size).
+    new(Mod, ClockMod, [], CallbackFun, Size).
 
 -spec new(Mod::module(), ClockMod::module(), Seed::list(), CallbackFun, Size::integer()) ->
     {CallbackFun, #eep_win{}}
@@ -47,7 +47,7 @@ new(Mod, ClockMod, Seed, CallbackFun, Size) ->
     W0 = eep_window:sliding({clock, ClockMod, 1}, Size, Mod, Seed),
     C0 = W0#eep_win.clock,
     L0 = W0#eep_win.log,
-    L1 = eep_winlog:tick(ClockMod:at(C0), L0),
+    L1 = eep_winlog:tick(eep_clock:at(C0), L0),
     {CallbackFun, W0#eep_win{log=L1}}.
 
 push({CBFun, Win}, Event) ->
@@ -67,8 +67,8 @@ tick({CBFun, Win}) ->
     end.
 
 expire_and_emit(CBFun, #eep_win{}=Win0) ->
-    #eep_win{aggmod=AMod, agg=Agg, size=S, log=Log, clockmod=CM, clock=C}=Win0,
-    At = CM:at(C),
+    #eep_win{aggmod=AMod, agg=Agg, size=S, log=Log, clock=C}=Win0,
+    At = eep_clock:at(C),
     case eep_winlog:expire(At - S, Log) of
         {[], Current} -> %% Nothing expiring
             {noop, Win0#eep_win{log=Current}};

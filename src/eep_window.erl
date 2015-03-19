@@ -81,7 +81,7 @@ tick_(#eep_win{}=Win) ->
         end,
     TickedLog =
         if Win#eep_win.compensating ->
-               Curr = CkMod:at(Win2#eep_win.clock),
+               Curr = eep_clock:at(Win2#eep_win.clock),
                eep_winlog:tick(Curr, Log);
            true -> Log
         end,
@@ -103,8 +103,8 @@ reset(#eep_win{compensating=false}=Win) ->
     Win#eep_win{agg=(AMod:init(Seed)), count=1}.
 
 compensate(#eep_win{compensating=true}=Win) ->
-    #eep_win{aggmod=AMod, agg=Agg, size=S, log=Log, clockmod=CM, clock=C}=Win,
-    At = CM:at(C),
+    #eep_win{aggmod=AMod, agg=Agg, size=S, log=Log, clock=C}=Win,
+    At = eep_clock:at(C),
     {Expiring, Current} = eep_winlog:expire(At - S, Log),
     % Compensated = lists:foldl(fun AMod:compensate/2, Agg, Expiring),
     Compensated = lists:foldl(fun(E, A) -> AMod:compensate(A, E) end,
@@ -125,12 +125,17 @@ decide([ {accumulate, Event} |Actions], Window, Decision) ->
     decide(Actions, accumulate(Event, Window), Decision);
 decide([ compensate |Actions], Window, Decision) ->
     decide(Actions, compensate(Window), Decision);
-decide([ emit |Actions], #eep_win{count=C, size=S}=Window, noop)
-  when C =< S -> %% TODO FIXME count < size -> skip emission 
-    decide(Actions, Window, noop);
+%decide([ emit |Actions], #eep_win{count=C, size=S}=Window, noop)
+%  when C =< S -> %% TODO FIXME count < size -> skip emission 
+%    decide(Actions, Window, noop);
 decide([ emit |Actions], #eep_win{}=Window, noop) ->
-    %% TODO This enforces only one emission per decision: is this right?
-    decide(Actions, Window, {emit, Window#eep_win.agg}).
+    #eep_win{size=Size, clock=C0}=Window,
+    %% We need to check the clock for total
+    %% elapsed time: if it's less than Size, skip the emission
+    Elapsed = eep_clock:elapsed(C0),
+    if Elapsed < Size -> decide(Actions, Window, noop);
+       true -> decide(Actions, Window, {emit, Window#eep_win.agg})
+    end.
 
 %% Process functionality: utils for running windows as a process.
 start(Window, AggMod, Interval) ->

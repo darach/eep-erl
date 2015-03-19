@@ -32,17 +32,13 @@
 
 %% clock behaviour.
 -export([name/0]).
--export([at/1]).
 -export([new/1]).
 -export([inc/1]).
 
 name() -> count.
 
-at(State) -> 
- State#eep_clock.at.
-
 new(Interval) ->
-  #eep_clock{at = 0, mark = 0, interval = Interval}.
+  #eep_clock{origin = 0, at = 0, mark = 0, interval = Interval}.
 
 inc(State) -> 
   State#eep_clock{at = State#eep_clock.at + 1}.
