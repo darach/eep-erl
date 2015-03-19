@@ -28,8 +28,9 @@
 
 -record(eep_clock,
         {
-         at = undefined :: integer() | undefined,
-         mark = undefined :: integer() | undefined,
+         origin = 0 :: integer(),
+         at   :: integer() | undefined,
+         mark :: integer() | undefined,
          interval = 1 :: integer()
         }).
 
@@ -38,6 +39,7 @@
          type :: tumbling | sliding,
          by :: event | ticks,
          compensating :: boolean(),
+         active :: boolean(),
          size :: pos_integer(),
          aggmod :: module(),
          agg :: any(),

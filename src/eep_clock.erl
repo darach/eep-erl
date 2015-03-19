@@ -28,28 +28,41 @@
 
 -include_lib("eep_erl.hrl").
 
+-export([at/1]).
+-export([elapsed/1]).
 -export([tick/2]).
 
 -callback name() ->
     Name :: atom().
--callback at(ck_state()) ->
-    Now :: integer().
 -callback new(Interval :: integer()) ->
     ck_state().
 -callback inc(Old :: ck_state()) ->
     New :: ck_state().
--callback tick(Old :: ck_state()) ->
-    {Tocked :: boolean(), New :: ck_state()}.
--callback tock(Old :: ck_state()) ->
-    {Tocked :: boolean(), New :: ck_state()}.
+
+-spec at(ck_state()) ->
+    Now :: integer().
+at(#eep_clock{at=At}) -> At.
+
+-spec elapsed(ck_state()) ->
+    Now :: integer().
+elapsed(#eep_clock{origin=Origin, at=At}) ->
+    At - Origin.
 
 -spec tick(module(), Curr :: ck_state()) ->
     {noop, UnTicked :: ck_state()}
     | {tock, Tocked :: ck_state()}.
-tick(CkMod, Clock) ->
-    case CkMod:tick(Clock) of
-        {false, UnTicked} -> {noop, UnTicked};
-        {true, Ticked} ->
-            {_, Tocked} = CkMod:tock(Ticked),
-            {tock, Tocked}
+tick(CkMod, Clock0) ->
+    Clock1 = CkMod:inc(Clock0),
+    #eep_clock{at=At, mark=Mark, interval=Interval}=Clock1,
+    if (At - Mark) >= Interval ->
+           {_, Tocked} = tock(Clock1),
+           {tock, Tocked};
+       true -> {noop, Clock1}
     end.
+
+tock(Clock0) ->
+  Delta = Clock0#eep_clock.at - Clock0#eep_clock.mark,
+  case Delta >= Clock0#eep_clock.interval of
+    true -> {true, Clock0#eep_clock{mark = Clock0#eep_clock.mark + Clock0#eep_clock.interval}};
+    false -> {false, Clock0}
+  end.

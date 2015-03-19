@@ -62,6 +62,7 @@
 -export([new/3]).
 -export([new/4]).
 -export([push/2]).
+-export([tick/1]).
 
 -record(state, {
     size :: integer(),
@@ -95,7 +96,7 @@ start(Mod, Size) ->
 %%
 -spec new(Mod::module(), CallbackFun::fun((...) -> any()), Size::integer()) ->#state{}.
 new(Mod, CallbackFun, Size) ->
-    {CallbackFun, eep_window:tumbling(event, Size, Mod, [])}.
+    new(Mod, [], CallbackFun, Size).
 
 -spec new(Mod::module(), Seed::list(), CallbackFun::fun((...) -> any()), Size::integer()) ->#state{}.
 new(Mod, Seed, CallbackFun, Size) ->
@@ -103,10 +104,12 @@ new(Mod, Seed, CallbackFun, Size) ->
 
 %-spec push(#state{}, any()) -> {noop,#state{}} | {emit,#state{}}.
 push({CBFun, Window}, Event) ->
-    case eep_window:push(Event, Window) of
+    case eep_window:decide([{accumulate, Event}, tick], Window) of
         {noop, Window1} ->
             {noop, {CBFun, Window1}};
         {{emit, Emission}, Window1} ->
             CBFun(Emission),
-            {emit, {CBFun, Window1}}
+            {emit, {CBFun, eep_window:reset(Window1)}}
     end.
+
+tick({_, _}=Win) -> {noop, Win}.

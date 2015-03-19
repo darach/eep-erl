@@ -33,39 +33,21 @@
 
 %% clock behaviour.
 -export([name/0]).
--export([at/1]).
 -export([new/1]).
 -export([inc/1]).
--export([tick/1]).
--export([tock/1]).
 
 %% impl
 -export([ts/0]).
 
 name() -> crock.
 
-at(State) -> 
- State#eep_clock.mark.
-
 new(Interval) ->
   At = ts(),
   Mark = At,
-  #eep_clock{at = At, interval = Interval, mark=Mark}.
+  #eep_clock{origin = At, at = At, interval = Interval, mark=Mark}.
 
 inc(State) -> 
   State#eep_clock{at = ts()}.
-
-tick(State) ->
-  NewState = inc(State),
-  #eep_clock{at=At, mark=Mark, interval=Interval}=NewState,
-  {(At - Mark) >= Interval, NewState}.
-
-tock(State) ->
-  Delta = State#eep_clock.at - State#eep_clock.mark,
-  case Delta >= State#eep_clock.interval of
-    true -> {true, State#eep_clock{mark = State#eep_clock.mark + State#eep_clock.interval}};
-    false -> {false, State}
-  end.
 
 ts() ->
   {MegaSecs,Secs,MicroSecs} = erlang:now(),

@@ -32,11 +32,10 @@
 
 -export([tumbling/4]).
 -export([sliding/4]).
--export([push/2]).
 -export([tick/1]).
 
 %% DEBUG
--export([accumulate/2, compensate/1, decide/3, decide/4, tick_/1]).
+-export([accumulate/2, compensate/1, reset/1, decide/2, decide/3, tick_/1]).
 
 -include("eep_erl.hrl").
 
@@ -60,10 +59,6 @@ sliding(event, Size, Aggregate, Seed) ->
     W#eep_win{by=event}. %% TODO FIXME
 
 %% Window command interface.
-push(Event, #eep_win{by=time}=Win) ->
-    decide([accumulate], Event, Win);
-push(Event, #eep_win{by=event}=Win) ->
-    decide([accumulate, tick], Event, Win).
 
 %% A thin wrapper that allows to stop external parties ticking a by-event window.
 %% TODO THis might be unnecessary - maybe we don't need to make this restriction?
@@ -73,7 +68,7 @@ tick(#eep_win{by=time, count=C}=Win) ->
     %% TODO FIXME This count increment doesn't feel right here - there must be
     %% a more elegant solution!
     {Actions, TickedWin} = tick_(Win#eep_win{count=C+1}),
-    decide(Actions, tick, TickedWin).
+    decide(Actions, TickedWin).
 
 tick_(#eep_win{}=Win) ->
     #eep_win{log=Log, clockmod=CkMod, clock=Clock} = Win,
@@ -86,7 +81,7 @@ tick_(#eep_win{}=Win) ->
         end,
     TickedLog =
         if Win#eep_win.compensating ->
-               Curr = CkMod:at(Win2#eep_win.clock),
+               Curr = eep_clock:at(Win2#eep_win.clock),
                eep_winlog:tick(Curr, Log);
            true -> Log
         end,
@@ -103,12 +98,13 @@ accumulate(Event, #eep_win{aggmod=AMod, agg=Agg, count=Count, log=Log}=Win) ->
            Accumed
     end.
 
-compensate(#eep_win{compensating=false}=Win) ->
+reset(#eep_win{compensating=false}=Win) ->
     #eep_win{aggmod=AMod, seed=Seed}=Win,
-    Win#eep_win{agg=(AMod:init(Seed)), count=1};
+    Win#eep_win{agg=(AMod:init(Seed)), count=1}.
+
 compensate(#eep_win{compensating=true}=Win) ->
-    #eep_win{aggmod=AMod, agg=Agg, size=S, log=Log, clockmod=CM, clock=C}=Win,
-    At = CM:at(C),
+    #eep_win{aggmod=AMod, agg=Agg, size=S, log=Log, clock=C}=Win,
+    At = eep_clock:at(C),
     {Expiring, Current} = eep_winlog:expire(At - S, Log),
     % Compensated = lists:foldl(fun AMod:compensate/2, Agg, Expiring),
     Compensated = lists:foldl(fun(E, A) -> AMod:compensate(A, E) end,
@@ -118,23 +114,28 @@ compensate(#eep_win{compensating=true}=Win) ->
 %% Given a list of actions (from the behaviour functions above), an event and
 %% the current window state, apply the actions in order and return the result.
 %% Its implementation is ~equivalent to lists:foldl/3 on the list of actions.
-decide(Actions, Event, Window) ->
-    decide(Actions, Event, Window, noop).
+decide(Actions, Window) ->
+    decide(Actions, Window, noop).
 
-decide([], _, Window, Decision) -> {Decision, Window};
-decide([ tick |Actions], Event, Window, Decision) ->
+decide([], Window, Decision) -> {Decision, Window};
+decide([ tick |Actions], Window, Decision) ->
     {MoreActions, TdWin} = tick_(Window),
-    decide(MoreActions++Actions, Event, TdWin, Decision);
-decide([ accumulate |Actions], Event, Window, Decision) ->
-    decide(Actions, Event, accumulate(Event, Window), Decision);
-decide([ compensate |Actions], Event, Window, Decision) ->
-    decide(Actions, Event, compensate(Window), Decision);
-decide([ emit |Actions], Event, #eep_win{count=C, size=S}=Window, noop)
-  when C =< S -> %% TODO FIXME count < size -> skip emission 
-    decide(Actions, Event, Window, noop);
-decide([ emit |Actions], Event, #eep_win{}=Window, noop) ->
-    %% TODO This enforces only one emission per decision: is this right?
-    decide([ compensate | Actions ], Event, Window, {emit, Window#eep_win.agg}).
+    decide(MoreActions++Actions, TdWin, Decision);
+decide([ {accumulate, Event} |Actions], Window, Decision) ->
+    decide(Actions, accumulate(Event, Window), Decision);
+decide([ compensate |Actions], Window, Decision) ->
+    decide(Actions, compensate(Window), Decision);
+%decide([ emit |Actions], #eep_win{count=C, size=S}=Window, noop)
+%  when C =< S -> %% TODO FIXME count < size -> skip emission 
+%    decide(Actions, Window, noop);
+decide([ emit |Actions], #eep_win{}=Window, noop) ->
+    #eep_win{size=Size, clock=C0}=Window,
+    %% We need to check the clock for total
+    %% elapsed time: if it's less than Size, skip the emission
+    Elapsed = eep_clock:elapsed(C0),
+    if Elapsed < Size -> decide(Actions, Window, noop);
+       true -> decide(Actions, Window, {emit, Window#eep_win.agg})
+    end.
 
 %% Process functionality: utils for running windows as a process.
 start(Window, AggMod, Interval) ->

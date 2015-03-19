@@ -32,6 +32,7 @@
 -export([new/3]).
 -export([new/4]).
 -export([push/2]).
+-export([tick/1]).
 
 -record(state, {
     size :: integer(),
@@ -63,10 +64,15 @@ new(Mod, Seed, CallbackFun, Size) ->
     {CallbackFun, eep_window:sliding(event, Size, Mod, Seed)}.
 
 push({CBFun, Win}, Event) ->
-    case eep_window:push(Event, Win) of
+    case eep_window:decide([{accumulate, Event}, tick], Win) of
         {noop, Pushed} ->
+            {noop, {CBFun, Pushed}};
+        {{emit, _}, #eep_win{count=C, size=S}=Pushed}
+          when C =< S ->
             {noop, {CBFun, Pushed}};
         {{emit, Emission}, Pushed} ->
             CBFun(Emission),
-            {emit, {CBFun, Pushed}}
+            {emit, {CBFun, eep_window:compensate(Pushed)}}
     end.
+
+tick({_,_}=Win) -> {noop, Win}.

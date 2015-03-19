@@ -34,26 +34,24 @@
 -export([push/2]).
 -export([tick/1]).
 
--record(state, {
-    size :: integer(),
-    mod :: module(),
-    seed = [] :: list(),
-    aggregate :: any(),
-    callback = undefined :: fun((...) -> any()),
-    count = 1 :: integer(),
-    prior = [] :: list()
-}).
-
--spec new(Mod::module(), ClockMod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
+-spec new(Mod::module(), ClockMod::module(), CallbackFun, Size::integer()) ->
+    {CallbackFun, #eep_win{}}
+      when CallbackFun :: fun((...) -> any()).
 new(Mod, ClockMod, CallbackFun, Size) ->
-    new(Mod, [], ClockMod, CallbackFun, Size).
+    new(Mod, ClockMod, [], CallbackFun, Size).
 
--spec new(Mod::module(), Seed::list(), ClockMod::module(), CallbackFun::fun((...) -> any()), Size::integer()) -> #state{}.
-new(Mod, Seed, ClockMod, CallbackFun, Size) ->
-    {CallbackFun, eep_window:sliding({clock, ClockMod, Size}, 1, Mod, Seed)}.
+-spec new(Mod::module(), ClockMod::module(), Seed::list(), CallbackFun, Size::integer()) ->
+    {CallbackFun, #eep_win{}}
+      when CallbackFun :: fun((...) -> any()).
+new(Mod, ClockMod, Seed, CallbackFun, Size) ->
+    W0 = eep_window:sliding({clock, ClockMod, 1}, Size, Mod, Seed),
+    C0 = W0#eep_win.clock,
+    L0 = W0#eep_win.log,
+    L1 = eep_winlog:tick(eep_clock:at(C0), L0),
+    {CallbackFun, W0#eep_win{log=L1}}.
 
 push({CBFun, Win}, Event) ->
-    case eep_window:push(Event, Win) of
+    case eep_window:decide([{accumulate, Event}], Win) of
         {noop, Pushed} ->
             {noop, {CBFun, Pushed}};
         {{emit, _}, _} ->
@@ -63,7 +61,23 @@ push({CBFun, Win}, Event) ->
 tick({CBFun, Win}) ->
     case eep_window:tick(Win) of
         {noop, Ticked} -> {noop, {CBFun, Ticked}};
-        {{emit, Emission}, Next} ->
-            CBFun(Emission),
-            {emit, {CBFun, Next}}
+        {{emit, _Emission}, Next} -> %% TODO Might need to also use Emission here?
+            {Emissions, WinN} = expire_and_emit(CBFun, Next),
+            {Emissions, {CBFun, WinN}}
+    end.
+
+expire_and_emit(CBFun, #eep_win{}=Win0) ->
+    #eep_win{aggmod=AMod, agg=Agg, size=S, log=Log, clock=C}=Win0,
+    At = eep_clock:at(C),
+    case eep_winlog:expire(At - S, Log) of
+        {[], Current} -> %% Nothing expiring
+            {noop, Win0#eep_win{log=Current}};
+        {Expiring, Current} ->
+            {Compensated, Emissions} = lists:foldl(fun(E, {A0, Ems}) ->
+                                              CBFun(A0), %% side effect
+                                              A1 = AMod:compensate(A0, E),
+                                              {A1, Ems++[{emit, A0}]}
+                                      end,
+                                      {Agg, []}, Expiring),
+            {Emissions, Win0#eep_win{agg=Compensated, log=Current}}
     end.

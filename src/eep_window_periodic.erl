@@ -70,7 +70,7 @@ new(AggMod, ClockMod, Seed, CallbackFun, Interval) ->
 
 -spec push(#eep_win{}, any()) -> {noop,#eep_win{}}.
 push({CBFun, Window}, Event) ->
-    {noop, Pushed} = eep_window:push(Event, Window),
+    {noop, Pushed} = eep_window:decide([{accumulate, Event}], Window),
     {noop, {CBFun, Pushed}}.
 
 tick({CBFun, Window}) ->
@@ -78,5 +78,5 @@ tick({CBFun, Window}) ->
         {noop, Next} -> {noop, {CBFun, Next}};
         {{emit, Emission}, Next} ->
             CBFun(Emission),
-            {emit, {CBFun, Next}}
+            {emit, {CBFun, eep_window:reset(Next)}}
     end.
