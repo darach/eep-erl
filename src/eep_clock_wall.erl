@@ -50,5 +50,5 @@ inc(State) ->
   State#eep_clock{at = ts()}.
 
 ts() ->
-  {MegaSecs,Secs,MicroSecs} = erlang:now(),
+  {MegaSecs,Secs,MicroSecs} = erlang:timestamp(),
   erlang:round((MegaSecs*1000000 + Secs)*1000 + (MicroSecs/1000)).
